@@ -1,0 +1,7 @@
+﻿# Per-machine dashboard configuration. Do not commit either file.
+
+# Python bytecode
+*.py[cod]
+
+.env
+config.js
