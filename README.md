@@ -5,9 +5,7 @@
 </p>
 
 <p align="center">
-  📊 数据可视化 · 🏠 智能家居控制 · ⏰ 日程管理
-  
-  📝 生活记录 · 🤖 HomeAssistant联动 · 🔒 Authentik统一认证
+  📊 数据可视化 · 🏠 智能家居控制 · ⏰ 日程管理 · 📝 生活记录 · 🤖 HomeAssistant联动 · 🔒 Authentik统一认证
 </p>
 
 ---
@@ -20,8 +18,8 @@
 
 让用户可以在一个统一的可视化界面中，快速了解自己的生活状态，并实现人与环境之间更加智能、高效的连接
 
-> **你的生活，不应该被碎片化的信息打扰 
-> Life Dashboard 希望成为你的个人数字驾驶舱**
+> **你的生活，不应该被碎片化的信息打扰**
+> **Life Dashboard 希望成为你的个人数字驾驶舱**
 
 ---
 
@@ -40,7 +38,7 @@
 - 🕒 实时时间展示
 - 🌤️ 天气信息展示 (未来可能接入)
 - 📅 今日 / 未来日程
-- 📈 数据统计分析
+- 📈 数据统计分析 (未来可能接入)
 - 📌 生活状态概览
 - 🚗 外卖进度 (未来可能接入)
 
@@ -99,42 +97,6 @@
 
 通过长期积累，形成属于自己的数字生活档案。
 
-
----
-
-# 🏗️ 系统架构
-
-```
-                 用户浏览器
-
-                      │
-
-                      ▼
-
-              H5 前端展示层
-
-                      │
-
-                      ▼
-
-              Java 后端服务层
-
-                      │
-
-        ┌─────────────┼─────────────┐
-
-        ▼             ▼             ▼
-
-   数据服务       用户系统     智能家居接口
-
-                                  │
-
-                                  ▼
-
-                           Home Assistant
-
-```
-
 ---
 
 # 🛠️ 技术栈
@@ -186,11 +148,11 @@
 
 ### 🌱 Personal Life OS
 
-不仅是一个 Dashboard。
+不仅是一个 Dashboard
 
 它更像一个：
 
-> 属于自己的数字生活操作系统。
+> 属于自己的数字生活操作系统
 
 
 ---
@@ -220,15 +182,22 @@ git clone https://github.com/Guyao146/life-dashboard.git
 进入后端目录：
 
 ```
+复制config.example.js，重命名为config.js
 
+修改 config.js 内的内容
 ```
 
-运行：
-
-```bash
-java -jar life-dashboard.jar
-```
-
+window.LIFE_HUB_CONFIG = {
+  oidc: {
+    clientId: '填入你authentik的OIDC客户端ID',
+    authorize: '填入回调地址 https://login.example.com/application/o/authorize/',
+    token: '填入获取Token链接 https://login.example.com/application/o/token/'
+  },
+  homeAssistant: {
+    url: '填入你的Homeassistant地址 https://home.example.com',
+    token: '填入你的Homeassistant长期Token your-home-assistant-long-lived-access-token'
+  }
+};
 
 ---
 
@@ -274,6 +243,6 @@ MIT License
 
 <p align="center">
 
-Made with ❤️ by Sakura
+Made with ❤️ by Sakura Gu
 
 </p>
