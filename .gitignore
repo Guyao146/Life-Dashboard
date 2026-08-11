@@ -1,8 +1,7 @@
-﻿# Per-machine dashboard configuration. Do not commit either file.
+﻿# Local environment files.
 
 # Python bytecode
 *.py[cod]
 
 .env
-config.js
 debug.log

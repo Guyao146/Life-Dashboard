@@ -104,27 +104,25 @@ git clone https://github.com/Guyao146/life-dashboard.git
 
 ---
 
-## 后端配置修改
+## 配置修改
 
-进入目录
+项目只使用根目录中的一个 `config.js`。请直接填写 Authentik 公共客户端和 Home Assistant 连接信息：
 
-```
-复制config.example.js，重命名为config.js
-
-修改 config.js 内的内容
-
+```javascript
 window.LIFE_HUB_CONFIG = {
   oidc: {
-    clientId: '填入你authentik的OIDC客户端ID',
-    authorize: '填入回调地址 https://login.example.com/application/o/authorize/',
-    token: '填入获取Token链接 https://login.example.com/application/o/token/'
+    clientId: "填入 Authentik OIDC 客户端 ID",
+    authorize: "https://login.example.com/application/o/authorize/",
+    token: "https://login.example.com/application/o/token/",
   },
   homeAssistant: {
-    url: '填入你的Homeassistant地址 https://home.example.com',
-    token: '填入你的Homeassistant长期Token your-home-assistant-long-lived-access-token'
-  }
+    url: "https://home.example.com",
+    token: "填入 Home Assistant 长期访问令牌",
+  },
 };
 ```
+
+> `config.js` 会发送到访问看板的浏览器，其中的 Home Assistant 令牌可被查看。请只在私密仓库与受保护的部署环境中使用，并采用最低权限专用账号。
 
 ---
 
@@ -139,6 +137,30 @@ window.LIFE_HUB_CONFIG = {
 - [ ] 多设备适配
 - [ ] 移动端 APP
 - [ ] 数据分析与趋势预测
+
+---
+
+# 🏷️ 版本发布
+
+当前版本由根目录的 `version.js` 统一管理，并显示在登录页、桌面侧栏和设置页。
+项目遵循语义化版本；每次更新产品代码时，必须同步升级版本号并填写 `CHANGELOG.md`。
+发布辅助工具使用 PHP 8 CLI，不依赖 Python 或 Node.js。
+
+```bash
+# 修复问题：0.3.0 -> 0.3.1
+php scripts/bump_version.php patch
+
+# 新增兼容功能：0.3.0 -> 0.4.0
+php scripts/bump_version.php minor
+
+# 不兼容升级：0.3.0 -> 1.0.0
+php scripts/bump_version.php major
+
+# 发布前校验
+php scripts/check_version.php
+```
+
+升级脚本会同时更新发布日期并创建更新日志模板。提交前必须将模板中的 `TODO` 替换为实际变更；Pull Request 会通过 GitHub Actions 检查产品代码是否同步升级了版本。
 
 
 ---

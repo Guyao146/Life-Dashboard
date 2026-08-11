@@ -1,0 +1,30 @@
+name: Version check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+      - name: Validate PHP scripts
+        run: php -l scripts/bump_version.php && php -l scripts/check_version.php
+      - name: Validate release metadata
+        if: github.event_name == 'push'
+        run: php scripts/check_version.php --base "${{ github.event.before }}"
+      - name: Require version bump for product changes
+        if: github.event_name == 'pull_request'
+        run: php scripts/check_version.php --base "${{ github.event.pull_request.base.sha }}"

@@ -36,7 +36,7 @@ button {
 }
 
 .sidebar {
-  padding:28px 18px;
+  padding:28px 18px 50px;
   border-right:1px solid var(--line);
   display:flex;
   flex-direction:column;
@@ -74,8 +74,14 @@ button {
 }
 
 .nav {
-  display:grid;
+  display:flex;
+  flex:1;
+  flex-direction:column;
   gap:5px
+}
+
+.nav .nav-settings-button {
+  margin-top:0
 }
 
 .nav button {
@@ -86,14 +92,60 @@ button {
   border-radius:10px;
   display:flex;
   gap:12px;
-  align-items:center
+  align-items:center;
+  position:relative;
+  overflow:hidden;
+  transition:color .22s ease,background-color .22s ease,transform .22s cubic-bezier(.22,1,.36,1),box-shadow .22s ease
+}
+
+.nav button:before {
+  content:'';
+  position:absolute;
+  left:0;
+  top:50%;
+  width:3px;
+  height:18px;
+  border-radius:0 4px 4px 0;
+  background:var(--accent);
+  opacity:0;
+  transform:translate(-4px,-50%) scaleY(.45);
+  transition:opacity .22s ease,transform .22s cubic-bezier(.22,1,.36,1)
+}
+
+.nav button:hover {
+  color:var(--ink);
+  background:rgba(255,255,255,.58);
+  transform:translateX(2px)
 }
 
 .nav button.active {
   color:var(--ink);
   background:#fff;
   font-weight:600;
-  box-shadow:0 2px 8px #dfe4df
+  box-shadow:0 6px 18px rgba(34,48,43,.08)
+}
+
+.nav button.active:before {
+  opacity:1;
+  transform:translate(0,-50%) scaleY(1)
+}
+
+.nav-label {
+  display:inline-block;
+  transform-origin:left center
+}
+
+.nav button.active .nav-label {
+  animation:nav-label-in .34s cubic-bezier(.22,1,.36,1)
+}
+
+@keyframes nav-label-in {
+  0% { opacity:.35; transform:translateX(-5px) scale(.97) }
+  100% { opacity:1; transform:translateX(0) scale(1) }
+}
+
+.nav-item-hidden {
+  display:none!important
 }
 
 .icon {
@@ -130,9 +182,13 @@ button {
 }
 
 main {
-  max-width:1480px;
+  max-width:2036px;
   width:100%;
   margin:auto;
+  display:grid;
+  grid-template-columns:250px minmax(0,1396px) minmax(250px,1fr);
+  column-gap:28px;
+  align-items:start;
   padding:108px 42px 50px
 }
 
@@ -180,7 +236,32 @@ main {
   display:grid;
   grid-template-columns:minmax(0,1.16fr) minmax(0,.84fr) minmax(0,.84fr);
   gap:16px;
-  align-items:start
+  align-items:start;
+  grid-auto-flow:row dense
+}
+
+.view-intro {
+  grid-column:1;
+  grid-row:1;
+  position:sticky;
+  top:126px;
+  align-self:start;
+  margin:0;
+  padding:4px 8px 0 0;
+  text-align:left
+}
+
+.view-intro h2 {
+  margin:5px 0 6px;
+  font-size:28px;
+  letter-spacing:-.04em
+}
+
+.view-intro p {
+  margin:0;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.7
 }
 
 .card {
@@ -322,6 +403,153 @@ main {
   border:1px solid rgba(255,255,255,.15);
   border-radius:8px;
   font:11px 'DM Mono',monospace
+}
+
+.rooms .environment-slot {
+  min-width:112px;
+  max-width:150px;
+  display:grid;
+  gap:2px;
+  padding:7px 10px;
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:9px;
+  background:rgba(255,255,255,.13);
+  color:#fff;
+  text-align:left;
+  transition:background .18s,border-color .18s,transform .18s
+}
+
+.rooms .environment-slot:hover {
+  background:rgba(255,255,255,.2);
+  border-color:rgba(255,255,255,.3);
+  transform:translateY(-1px)
+}
+
+.rooms .environment-slot span {
+  overflow:hidden;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:#bfe2da;
+  font:10px/1.35 'Noto Sans SC',sans-serif;
+  text-overflow:ellipsis;
+  white-space:nowrap
+}
+
+.rooms .environment-slot strong {
+  overflow:hidden;
+  font:500 12px/1.35 'DM Mono',monospace;
+  text-overflow:ellipsis;
+  white-space:nowrap
+}
+
+.environment-picker-box {
+  width:min(620px,calc(100vw - 36px))
+}
+
+.environment-picker-box .card-head>div {
+  display:grid;
+  gap:3px
+}
+
+.environment-slot-kicker {
+  color:var(--accent);
+  font:500 11px 'DM Mono',monospace;
+  letter-spacing:.08em
+}
+
+.environment-picker-list {
+  min-height:150px;
+  display:grid;
+  gap:12px;
+  overflow:auto;
+  padding:3px 2px 2px
+}
+
+.environment-sensor-group {
+  overflow:hidden;
+  border:1px solid #e2e9e5;
+  border-radius:14px;
+  background:#fbfcfb
+}
+
+.environment-sensor-group h3 {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:0;
+  padding:11px 13px;
+  border-bottom:1px solid #e7ece9;
+  color:#52605b;
+  font-size:12px
+}
+
+.environment-sensor-options {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  padding:10px
+}
+
+.environment-sensor-option {
+  position:relative;
+  display:grid;
+  grid-template-columns:18px minmax(0,1fr) auto;
+  align-items:center;
+  gap:9px;
+  min-height:53px;
+  padding:9px 10px;
+  border:1px solid #e2e8e4;
+  border-radius:11px;
+  background:#fff;
+  cursor:pointer
+}
+
+.environment-sensor-option:has(input:checked) {
+  border-color:#8bc7b8;
+  background:#eef8f5;
+  box-shadow:0 0 0 2px rgba(21,126,108,.08)
+}
+
+.environment-sensor-option input {
+  width:16px;
+  height:16px;
+  margin:0;
+  accent-color:var(--accent)
+}
+
+.environment-sensor-copy {
+  min-width:0;
+  display:grid;
+  gap:2px
+}
+
+.environment-sensor-copy b,.environment-sensor-copy small {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap
+}
+
+.environment-sensor-copy b {
+  font-size:12px
+}
+
+.environment-sensor-copy small {
+  color:var(--muted);
+  font:10px 'DM Mono',monospace
+}
+
+.environment-sensor-value {
+  color:var(--accent);
+  font:500 12px 'DM Mono',monospace
+}
+
+.environment-sensor-empty {
+  grid-column:1/-1;
+  padding:12px;
+  color:var(--muted);
+  text-align:center;
+  font-size:12px
 }
 
 .delivery {
@@ -1047,6 +1275,11 @@ main {
   min-height:18px
 }
 
+#auth-login:disabled {
+  cursor:not-allowed;
+  opacity:.58
+}
+
 .logout {
   margin-top:9px;
   background:transparent!important;
@@ -1061,9 +1294,15 @@ main {
 
 /* 统一组件节奏：所有卡片共享同一内边距、圆角和最小高度，跨列只改变宽度。 */
 .grid {
+  grid-column:2;
+  grid-row:1;
   grid-template-columns:repeat(3,minmax(0,1fr));
-  grid-auto-rows:minmax(253px,auto);
-  align-items:stretch
+  grid-auto-rows:auto;
+  grid-auto-flow:row dense;
+  align-items:start;
+  align-content:start;
+  justify-items:stretch;
+  justify-content:start
 }
 .card {
   min-width:0;
@@ -1072,14 +1311,34 @@ main {
 }
 .hero,.delivery { min-height:253px }
 .agenda,.quick,.habit,.energy,.devices { align-self:stretch }
-.settings-page { display:none; padding-bottom:30px }
+.settings-page { grid-column:2; grid-row:1; display:none; padding-bottom:30px; transform-origin:top left }
 .settings-page.is-active { display:block }
-.settings-intro h2 { margin:5px 0 6px; font-size:28px; letter-spacing:-.04em }
-.settings-intro p,.settings-card p { color:var(--muted); font-size:13px; margin:0; line-height:1.7 }
-.settings-grid { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr); gap:16px; margin-top:22px }
+.settings-card p { color:var(--muted); font-size:13px; margin:0; line-height:1.7 }
+.settings-grid {
+  display:grid;
+  grid-template-columns:minmax(0,1.2fr) minmax(300px,.8fr);
+  grid-template-areas:
+    "widgets profile"
+    "widgets account"
+    "navigation version";
+  gap:16px;
+  margin-top:0;
+  align-items:stretch
+}
+.settings-stack { display:contents }
+.settings-stack:first-child .settings-card:nth-child(1) { grid-area:widgets }
+.settings-stack:first-child .settings-card:nth-child(2) { grid-area:navigation }
+.settings-stack:last-child .settings-card:nth-child(1) { grid-area:profile }
+.settings-stack:last-child .settings-card:nth-child(2) { grid-area:account }
+.settings-stack:last-child .settings-card:nth-child(3) { grid-area:version }
 .settings-card { background:var(--card); border:1px solid #eef1ef; border-radius:18px; padding:22px; box-shadow:var(--shadow) }
 .settings-card h3 { margin:0 0 6px; font-size:16px }
+.profile-form { margin-top:15px }
+.profile-form .field { margin:0 0 10px }
+.profile-form .btn { width:100% }
 .widget-settings { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin-top:18px }
+.nav-settings { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin-top:18px }
+.nav-settings .widget-toggle { min-height:54px }
 .widget-toggle { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:58px; padding:11px 13px; border:1px solid #e8eeea; border-radius:12px; cursor:pointer; background:#fff }
 .widget-toggle:hover { border-color:#b9ddd3; background:#f5fbf9 }
 .widget-toggle span { min-width:0 }
@@ -1093,8 +1352,39 @@ main {
 .widget-toggle input:checked+i:after { transform:translateX(16px) }
 .settings-actions { display:grid; gap:10px; margin-top:20px }
 .settings-actions .btn { text-align:left }
+.settings-version { display:grid; gap:13px; margin:0; padding:22px; border-color:#dceae4; background:linear-gradient(135deg,#f7fcfa,#edf7f3); color:var(--muted); font-size:12px; box-shadow:var(--shadow),inset 0 1px rgba(255,255,255,.8) }
+.version-heading { display:flex; align-items:center; gap:10px }
+.version-heading>span:last-child { display:grid; gap:3px }
+.version-heading small { color:var(--muted); font-size:10px; letter-spacing:.06em; text-transform:uppercase }
+.version-heading b { color:var(--ink); font-size:13px }
+.version-mark { display:grid; place-items:center; width:34px; height:34px; border-radius:11px; background:var(--accent); color:#fff; font-size:19px; box-shadow:0 5px 12px rgba(21,126,108,.2) }
+.settings-version>strong { color:var(--accent); font:600 17px 'DM Mono',monospace; letter-spacing:-.04em }
+.version-actions { display:flex; gap:8px }
+.version-actions .btn { flex:1; text-align:center; padding:9px 10px; font-size:12px; text-decoration:none }
+.version-status { min-height:16px; color:var(--muted); font-size:11px }
+.version-status:before { content:'●'; color:var(--accent); margin-right:5px }
+.version-actions button:disabled { cursor:wait; opacity:.65 }
 .btn.danger { color:#b64d3d; background:#fff0ed }
 .grid.is-hidden { display:none }
+
+.scene-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px }
+.scene-item { display:grid; grid-template-columns:36px minmax(0,1fr) auto; align-items:center; gap:11px; text-align:left; padding:13px; border:1px solid #e4ece8; border-radius:13px; background:#f9fbfa; color:var(--ink); transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease }
+.scene-item:hover { transform:translateY(-2px); border-color:#b8dacf; box-shadow:0 8px 18px rgba(21,126,108,.09) }
+.scene-icon { display:grid; place-items:center; width:36px; height:36px; border-radius:11px; background:var(--accent-soft); color:var(--accent); font-size:17px }
+.scene-copy { display:grid; gap:3px; min-width:0 }
+.scene-copy strong,.scene-copy small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.scene-copy small { color:var(--muted); font:400 11px 'DM Mono',monospace }
+.scene-action { padding:6px 9px; border-radius:8px; background:#fff; color:var(--accent); font-size:11px; font-weight:700; box-shadow:0 1px 4px rgba(30,50,44,.08) }
+
+@media (max-width:700px) {
+  .scene-list { grid-template-columns:1fr }
+  .settings-version { align-items:flex-start; flex-direction:column }
+  .settings-version strong { text-align:left }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .scene-item { transition:none }
+}
 
 /* 三档统一尺寸：小=1列，中=2列，大=3列；所有卡片共享同一行高基准。 */
 .grid > .card.size-small,
@@ -1102,7 +1392,7 @@ main {
 .grid > .card.size-large {
   grid-column:auto;
   min-height:253px;
-  align-self:stretch;
+  align-self:start;
 }
 .grid > .card.size-small { grid-column:span 1 }
 .grid > .card.size-medium { grid-column:span 2 }
@@ -1134,7 +1424,7 @@ main {
 .widget-drag-ghost { position:fixed; left:-1000px; top:-1000px; z-index:999; min-width:132px; height:42px; display:flex; align-items:center; gap:9px; padding:0 14px; border:1px solid #b9ddd3; border-radius:12px; background:rgba(255,255,255,.96); color:var(--ink); box-shadow:0 12px 30px rgba(25,40,35,.18); font-size:13px; font-weight:600 }
 .widget-drag-ghost:before { content:'⠿'; color:var(--accent); font-size:19px; font-weight:400 }
 @media(prefers-reduced-motion:reduce) {
-  .grid > .card { animation:none!important }
+  .grid > .card,.settings-page,.settings-card,.nav button,.nav button:before,.nav-label { animation:none!important; transition:none!important }
 }
 .widget-setting-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center }
 .widget-size { height:42px; border:1px solid #e8eeea; border-radius:10px; padding:0 9px; color:var(--ink); background:#fff; font-size:12px; cursor:pointer }
@@ -1143,6 +1433,26 @@ main {
 .ha-device-group:last-child { margin-bottom:0 }
 .device-items { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:8px; padding:0 10px 10px }
 .ha-device-group .device-item { min-height:68px }
+
+/* 只有画布两侧都容得下说明栏时才启用三列；否则保持原来的 1480px 卡片画布。 */
+@media(max-width:2279px) {
+  main {
+    display:block;
+    max-width:1480px
+  }
+
+  .view-intro {
+    position:static;
+    margin:0 0 22px;
+    padding:0
+  }
+
+  .grid,.settings-page {
+    grid-column:auto;
+    grid-row:auto
+  }
+}
+
 @media(max-width:900px) {
   .widget-drag-handle { display:none }
 
@@ -1155,7 +1465,19 @@ main {
   }
 
   main {
+    display:block;
     padding:98px 18px 88px
+  }
+
+  .view-intro {
+    position:static;
+    margin:0 0 22px;
+    padding:0
+  }
+
+  .grid,.settings-page {
+    grid-column:auto;
+    grid-row:auto
   }
 
   .top {
@@ -1173,7 +1495,7 @@ main {
 
   .grid {
     grid-template-columns:1fr 1fr;
-    grid-auto-rows:minmax(253px,auto);
+    grid-auto-rows:auto;
     gap:12px
   }
 
@@ -1218,7 +1540,17 @@ main {
     font-size:18px
   }
 
-  .settings-grid { grid-template-columns:1fr; gap:12px }
+  .settings-grid {
+    grid-template-columns:1fr;
+    grid-template-areas:
+      "widgets"
+      "profile"
+      "navigation"
+      "account"
+      "version";
+    gap:12px;
+    align-items:start
+  }
 
   .grid > .card.size-small,
   .grid > .card.size-medium,
@@ -1313,9 +1645,10 @@ main {
     margin-top:14px
   }
   .widget-settings { grid-template-columns:1fr }
+  .nav-settings { grid-template-columns:1fr }
   .widget-setting-row { grid-template-columns:minmax(0,1fr) 76px }
   .settings-card { padding:18px; border-radius:15px }
-  .settings-intro h2 { font-size:24px }
+  .view-intro h2 { font-size:24px }
 
   .grid > .card.size-small,
   .grid > .card.size-medium,
@@ -1324,6 +1657,57 @@ main {
   .widget-menu { margin-left:5px }
   .widget-menu-popover { width:180px }
 
+}
+
+/* 环境传感器选择器可容纳较多实体，桌面和手机都只滚动选项区。 */
+#environment-picker-modal {
+  overflow-y:auto;
+  align-items:start
+}
+
+#environment-picker-modal .environment-picker-box {
+  max-height:min(720px,calc(100vh - 36px));
+  margin:auto
+}
+
+#environment-picker-modal .environment-picker-list {
+  flex:1;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain
+}
+
+.environment-sensor-group h3 small {
+  margin-left:auto;
+  color:var(--muted);
+  font-weight:400
+}
+
+@media(max-width:580px) {
+  .card.hero {
+    min-height:270px
+  }
+
+  .rooms .environment-slot {
+    min-width:102px;
+    max-width:124px
+  }
+
+  #environment-picker-modal {
+    align-items:end;
+    padding:0
+  }
+
+  #environment-picker-modal .environment-picker-box {
+    width:100%;
+    max-height:88vh;
+    margin:0;
+    border-radius:22px 22px 0 0
+  }
+
+  .environment-sensor-options {
+    grid-template-columns:1fr
+  }
 }
 
 /* 快捷设备选择器：保留自然的卡片尺寸；设备很多时只滚动展开项。 */
