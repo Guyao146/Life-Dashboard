@@ -7,9 +7,9 @@
  */
 window.LIFE_HUB_CONFIG = Object.freeze({
   oidc: Object.freeze({
-    clientId: "4Xg4mjRczi40YXTuox65DlfMz2nUxHzQIVtEdNxE",
-    authorize: "https://login.mcylyr.cn/application/o/authorize/",
-    token: "https://login.mcylyr.cn/application/o/token/",
+    clientId: "XXXXXXXXXXXXXXXX",
+    authorize: "https://XXXX.XXXX.cn/application/o/authorize/",
+    token: "https://XXXX.XXXX.cn/application/o/token/",
   }),
   homeAssistant: Object.freeze({
     url: "https://home.example.com",

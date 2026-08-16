@@ -6,6 +6,14 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [0.4.0] - 2026-08-16
+
+### 新增
+
+- 登录页全新改版：左侧品牌介绍栏 + 右侧登录卡片，窄屏自动收起为单卡片。
+- 本地账号密码登录（纯前端 PBKDF2-SHA256 校验），支持静态托管，与 Authentik OAuth 登录并存。
+- `config.js` 新增 `localAuth` 配置项，附密码哈希生成说明；连续失败 5 次锁定 30 秒。
+
 ## [0.3.0] - 2026-08-07
 
 ### 新增
@@ -19,4 +27,5 @@
 - 恢复 Authentik 公共客户端配置的默认加载，私有 `config.js` 缺失时仍可登录。
 - 登录配置加载前禁用登录按钮，并在配置异常时显示明确错误。
 
+[0.4.0]: https://github.com/Guyao146/homeassistant-web/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Guyao146/homeassistant-web/releases/tag/v0.3.0

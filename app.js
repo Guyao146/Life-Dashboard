@@ -4,6 +4,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     document.querySelectorAll('[data-app-version]').forEach(element=>{element.textContent=releaseLabel});
     const projectUrl='https://github.com/Guyao146/homeassistant-web',versionSources=[`${projectUrl}/raw/main/version.js`,`${projectUrl}/raw/master/version.js`];
     let OIDC=null;
+    let LOCAL=null;
     const redirectUri=location.origin+location.pathname;
     let HA=null;
     async function loadRuntimeConfig(){
@@ -16,6 +17,8 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       if(!config?.homeAssistant?.token)missing.push('homeAssistant.token');
       if(missing.length)throw new Error(`config.js 配置缺失：${missing.join('、')}`);
       OIDC={...config.oidc};
+      const localAuth=config.localAuth;
+      LOCAL=localAuth?.username&&localAuth?.pbkdf2?.salt&&localAuth?.pbkdf2?.hash?{username:String(localAuth.username),pbkdf2:{salt:localAuth.pbkdf2.salt,hash:localAuth.pbkdf2.hash,iterations:Number(localAuth.pbkdf2.iterations)||310000}}:null;
       HA={...config.homeAssistant,url:String(config.homeAssistant.url).replace(/\/$/,'')};
     }
     const b64url=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replaceAll('+','-').replaceAll('/','_').replaceAll('=','');
@@ -47,6 +50,11 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
         return true
       }
       if(!params.get('code')){
+        const local=readSession('life-hub-local');
+        if(sessionStorage.getItem('life-hub-dashboard-access')==='true'||stored?.expiresAt>Date.now()||local?.expiresAt>Date.now()){
+          enterDashboard();
+          return true
+        }
         $('#app-loader').classList.add('hidden');
         return false
       }
@@ -70,9 +78,42 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       sessionStorage.removeItem('life-hub-oidc');
       sessionStorage.removeItem('life-hub-pkce');
       sessionStorage.removeItem('life-hub-dashboard-access');
+      sessionStorage.removeItem(localSessionKey);
+      sessionStorage.removeItem(localFailsKey);
+      sessionStorage.removeItem(localLockKey);
       location.assign(redirectUri)
     }
     $('#auth-logout').onclick=logout;
+    const localSessionKey='life-hub-local',localFailsKey='life-hub-local-fails',localLockKey='life-hub-local-lock';
+    function b64ToBytes(b64){const bin=atob(b64),bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return bytes}
+    async function deriveLocalHash(password,saltB64,iterations){
+      const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);
+      const bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:b64ToBytes(saltB64),iterations},key,256);
+      return btoa(String.fromCharCode(...new Uint8Array(bits)))
+    }
+    $('#auth-form').addEventListener('submit',async event=>{
+      event.preventDefault();
+      const submit=$('#auth-submit'),username=$('#auth-user').value.trim(),password=$('#auth-pass').value;
+      loginError('');
+      if(!LOCAL){loginError('本地账号未配置：请在 config.js 的 localAuth 中填写账号信息');return}
+      if(!window.isSecureContext){loginError('本地登录需要 HTTPS 部署（localhost 除外）');return}
+      const lock=readSession(localLockKey);
+      if(lock?.until>Date.now()){loginError(`尝试次数过多，请 ${Math.ceil((lock.until-Date.now())/1000)} 秒后重试`);return}
+      submit.disabled=true;submit.textContent='正在验证…';
+      try{
+        const hash=await deriveLocalHash(password,LOCAL.pbkdf2.salt,LOCAL.pbkdf2.iterations);
+        if(username!==LOCAL.username||hash!==LOCAL.pbkdf2.hash){
+          const fails=(readSession(localFailsKey)||0)+1;
+          if(fails>=5){sessionStorage.setItem(localLockKey,JSON.stringify({until:Date.now()+30000}));sessionStorage.removeItem(localFailsKey);loginError('账号或密码不正确，已连续失败 5 次，请 30 秒后重试')}
+          else{sessionStorage.setItem(localFailsKey,String(fails));loginError('账号或密码不正确')}
+          return
+        }
+        sessionStorage.removeItem(localFailsKey);
+        sessionStorage.setItem(localSessionKey,JSON.stringify({username,expiresAt:Date.now()+12*60*60*1000}));
+        enterDashboard()
+      }catch(err){loginError(`本地登录失败：${err.message}`)}
+      finally{submit.disabled=false;submit.textContent='登　录'}
+    });
     const displayNameKey='life-hub-display-name',defaultDisplayName='Gu';
     let renderedDate='',renderedGreeting='';
     function displayName(){try{return (localStorage.getItem(displayNameKey)||defaultDisplayName).trim().slice(0,24)||defaultDisplayName}catch(err){return defaultDisplayName}}

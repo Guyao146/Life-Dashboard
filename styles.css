@@ -1217,24 +1217,135 @@ main {
   transform:none
 }
 
+/* 登录页：左侧品牌介绍栏 + 右侧登录卡片，与主界面的绿色视觉保持一致。 */
 .auth-gate {
   position:fixed;
   inset:0;
   z-index:100;
-  background:linear-gradient(145deg,#e9f0ec,#f8faf8);
+  background:var(--bg);
   display:grid;
-  place-items:center;
-  padding:22px
+  grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);
+  overflow:auto
 }
 
 .auth-gate.hidden {
   display:none
 }
 
+.auth-panel {
+  position:relative;
+  padding:44px 52px;
+  background:linear-gradient(160deg,#0e2b25,#157e6c 135%);
+  color:#eaf4f0;
+  display:flex;
+  flex-direction:column;
+  gap:28px;
+  overflow:hidden
+}
+
+.auth-panel:before,
+.auth-panel:after {
+  content:'';
+  position:absolute;
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:50%;
+  pointer-events:none
+}
+
+.auth-panel:before {
+  width:340px;
+  height:340px;
+  right:-120px;
+  bottom:-140px
+}
+
+.auth-panel:after {
+  width:180px;
+  height:180px;
+  right:120px;
+  bottom:-90px;
+  border-color:rgba(255,255,255,.1)
+}
+
+.auth-brand {
+  display:flex;
+  gap:10px;
+  align-items:center;
+  font-weight:700;
+  font-size:17px;
+  position:relative
+}
+
+.auth-panel .logo {
+  background:rgba(255,255,255,.16)
+}
+
+.auth-copy {
+  margin:auto 0;
+  max-width:430px;
+  position:relative
+}
+
+.auth-headline {
+  font-size:30px;
+  line-height:1.5;
+  letter-spacing:.02em;
+  margin:0 0 20px
+}
+
+.auth-points {
+  list-style:none;
+  margin:0;
+  padding:0;
+  display:grid;
+  gap:12px;
+  font-size:13.5px;
+  color:#cfe3dc
+}
+
+.auth-points li {
+  display:flex;
+  gap:12px;
+  align-items:center
+}
+
+.pt-icon {
+  width:32px;
+  height:32px;
+  border-radius:10px;
+  background:rgba(255,255,255,.12);
+  display:grid;
+  place-items:center;
+  flex:none;
+  font-size:14px
+}
+
+.auth-panel-foot {
+  position:relative;
+  font-size:12px;
+  color:#a8c6bd;
+  display:flex;
+  gap:10px;
+  align-items:center
+}
+
+.auth-mono {
+  font-family:'DM Mono',monospace;
+  font-size:11px;
+  letter-spacing:.06em;
+  padding:3px 9px;
+  border:1px solid rgba(255,255,255,.22);
+  border-radius:99px;
+  color:#dff0ea
+}
+
 .auth-card {
-  width:min(390px,100%);
-  padding:35px 30px;
-  background:#fff;
+  align-self:center;
+  justify-self:center;
+  width:min(392px,100%);
+  margin:22px;
+  padding:36px 32px;
+  background:var(--card);
   border:1px solid #e5ebe6;
   border-radius:22px;
   box-shadow:0 20px 60px rgba(28,46,39,.12);
@@ -1242,7 +1353,17 @@ main {
 }
 
 .auth-card .logo {
-  margin:0 auto 18px
+  margin:0 auto 18px;
+  width:46px;
+  height:46px;
+  border-radius:14px
+}
+
+.auth-card .logo:after {
+  width:18px;
+  height:18px;
+  top:12px;
+  left:12px
 }
 
 .auth-card h1 {
@@ -1254,25 +1375,84 @@ main {
   color:var(--muted);
   font-size:13px;
   line-height:1.7;
-  margin:0 0 22px
+  margin:0 0 24px
 }
 
 .auth-card .btn {
   width:100%;
-  font-weight:600
+  font-weight:600;
+  padding:12px 14px;
+  font-size:14px
 }
 
-.auth-card .guest {
-  margin-top:9px;
-  background:#edf5f1;
-  color:var(--accent)
+.auth-form {
+  display:grid;
+  gap:12px;
+  text-align:left;
+  margin:0 0 4px
+}
+
+.auth-field {
+  display:grid;
+  gap:6px
+}
+
+.auth-field label {
+  font-size:12px;
+  font-weight:500;
+  color:var(--muted)
+}
+
+.auth-field input {
+  width:100%;
+  padding:11px 13px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fbfcfb;
+  font:inherit;
+  color:var(--ink);
+  outline:none;
+  transition:border-color .15s,box-shadow .15s,background .15s
+}
+
+.auth-field input:focus {
+  border-color:var(--accent);
+  background:#fff;
+  box-shadow:0 0 0 3px rgba(21,126,108,.13)
+}
+
+.auth-submit {
+  letter-spacing:normal
+}
+
+#auth-submit:disabled {
+  cursor:not-allowed;
+  opacity:.58
+}
+
+.auth-divider {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin:16px 0 14px;
+  color:var(--muted);
+  font-size:12px
+}
+
+.auth-divider:before,
+.auth-divider:after {
+  content:'';
+  flex:1;
+  height:1px;
+  background:var(--line)
 }
 
 .auth-error {
   color:#ba4d39;
   font-size:12px;
   margin-top:14px;
-  min-height:18px
+  min-height:18px;
+  line-height:1.6
 }
 
 #auth-login:disabled {
@@ -1285,6 +1465,30 @@ main {
   background:transparent!important;
   color:#6c7671!important;
   text-decoration:underline
+}
+
+.auth-card-foot {
+  margin-top:24px;
+  padding-top:16px;
+  border-top:1px dashed var(--line);
+  font-size:11.5px;
+  color:var(--muted);
+  line-height:1.6
+}
+
+@media (max-width:900px) {
+  .auth-gate {
+    grid-template-columns:1fr;
+    place-items:center
+  }
+
+  .auth-panel {
+    display:none
+  }
+
+  .auth-card {
+    margin:0
+  }
 }
 
 .mobile-nav {
@@ -1319,7 +1523,11 @@ main {
   grid-template-columns:minmax(0,1.2fr) minmax(300px,.8fr);
   grid-template-areas:
     "widgets profile"
+    "widgets appearance"
+    "widgets weather"
+    "widgets ai"
     "widgets account"
+    "countdowns version"
     "navigation version";
   gap:16px;
   margin-top:0;
@@ -1327,10 +1535,14 @@ main {
 }
 .settings-stack { display:contents }
 .settings-stack:first-child .settings-card:nth-child(1) { grid-area:widgets }
-.settings-stack:first-child .settings-card:nth-child(2) { grid-area:navigation }
+.settings-stack:first-child .settings-card:nth-child(2) { grid-area:countdowns }
+.settings-stack:first-child .settings-card:nth-child(3) { grid-area:navigation }
 .settings-stack:last-child .settings-card:nth-child(1) { grid-area:profile }
-.settings-stack:last-child .settings-card:nth-child(2) { grid-area:account }
-.settings-stack:last-child .settings-card:nth-child(3) { grid-area:version }
+.settings-stack:last-child .settings-card:nth-child(2) { grid-area:appearance }
+.settings-stack:last-child .settings-card:nth-child(3) { grid-area:weather }
+.settings-stack:last-child .settings-card:nth-child(4) { grid-area:ai }
+.settings-stack:last-child .settings-card:nth-child(5) { grid-area:account }
+.settings-stack:last-child .settings-card:nth-child(6) { grid-area:version }
 .settings-card { background:var(--card); border:1px solid #eef1ef; border-radius:18px; padding:22px; box-shadow:var(--shadow) }
 .settings-card h3 { margin:0 0 6px; font-size:16px }
 .profile-form { margin-top:15px }
@@ -1360,7 +1572,7 @@ main {
 .version-mark { display:grid; place-items:center; width:34px; height:34px; border-radius:11px; background:var(--accent); color:#fff; font-size:19px; box-shadow:0 5px 12px rgba(21,126,108,.2) }
 .settings-version>strong { color:var(--accent); font:600 17px 'DM Mono',monospace; letter-spacing:-.04em }
 .version-actions { display:flex; gap:8px }
-.version-actions .btn { flex:1; text-align:center; padding:9px 10px; font-size:12px; text-decoration:none }
+.version-actions .btn { flex:1; display:flex; align-items:center; justify-content:center; text-align:center; padding:9px 10px; font-size:12px; text-decoration:none }
 .version-status { min-height:16px; color:var(--muted); font-size:11px }
 .version-status:before { content:'●'; color:var(--accent); margin-right:5px }
 .version-actions button:disabled { cursor:wait; opacity:.65 }
@@ -1544,8 +1756,12 @@ main {
     grid-template-columns:1fr;
     grid-template-areas:
       "widgets"
-      "profile"
+      "countdowns"
       "navigation"
+      "profile"
+      "appearance"
+      "weather"
+      "ai"
       "account"
       "version";
     gap:12px;
@@ -1757,3 +1973,110 @@ main {
   }
 
 }
+
+/* ===== 天气与预报 ===== */
+.weather-body { display:grid; gap:14px }
+.weather-now { display:flex; align-items:center; gap:14px }
+.weather-icon { font-size:38px; line-height:1 }
+.weather-main { display:grid; gap:2px }
+.weather-main b { font:600 26px 'DM Mono',monospace; letter-spacing:-.02em }
+.weather-main small, .weather-side small { color:var(--muted); font-size:12px }
+.weather-side { margin-left:auto; text-align:right; display:grid; gap:2px; align-items:center }
+.weather-days { display:grid; grid-template-columns:repeat(3,1fr); gap:8px }
+.weather-day { display:grid; justify-items:center; gap:3px; padding:10px 6px; background:var(--bg); border-radius:12px; font-size:11.5px; color:var(--muted) }
+.weather-day span { font-size:20px; line-height:1 }
+.weather-day b { color:var(--ink); font-size:12px; font-weight:500 }
+
+/* ===== 纪念日与倒数 ===== */
+.countdown-list { display:grid; gap:8px; align-content:start }
+.countdown-item { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border-radius:12px; background:var(--bg) }
+.countdown-copy { display:grid; gap:2px; min-width:0 }
+.countdown-copy b { font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.countdown-copy small { color:var(--muted); font-size:11.5px }
+.countdown-pill { font:500 12px 'DM Mono',monospace; color:var(--accent); background:var(--accent-soft); padding:4px 10px; border-radius:99px; white-space:nowrap }
+.countdown-item.today .countdown-pill { background:var(--orange-soft); color:var(--orange) }
+.countdown-settings { display:grid; gap:6px; margin:12px 0 4px }
+.countdown-setting-row { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px; background:var(--bg); font-size:12.5px }
+.countdown-setting-row > span { font-weight:500 }
+.countdown-setting-row small { color:var(--muted); flex:1 }
+.countdown-setting-row button { width:24px; height:24px; border-radius:8px; background:transparent; color:#b64d3d; font-size:15px; line-height:1 }
+.countdown-empty { color:var(--muted); font-size:12.5px; padding:10px 0 }
+.countdown-add { margin-top:10px }
+.countdown-yearly { margin:2px 0 10px }
+
+/* ===== AI 助手 ===== */
+.nav-ai-button { color:var(--muted) }
+.nav-ai-button .icon { color:var(--accent) }
+.ai-panel { position:fixed; right:18px; bottom:18px; width:min(380px,calc(100vw - 36px)); height:min(560px,calc(100vh - 120px)); background:var(--card); border:1px solid var(--line); border-radius:18px; box-shadow:0 24px 70px rgba(20,32,28,.25); display:flex; flex-direction:column; z-index:90; opacity:0; transform:translateY(14px) scale(.98); pointer-events:none; transition:opacity .22s,transform .22s }
+.ai-panel.open { opacity:1; transform:none; pointer-events:auto }
+.ai-head { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--line) }
+.ai-title { display:flex; align-items:center; gap:8px; font-size:14px }
+.ai-title small { color:var(--muted); font-size:11px; font-family:'DM Mono',monospace; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.ai-dot { width:8px; height:8px; border-radius:50%; background:#c9d4cd; flex:none }
+.ai-dot.ok { background:var(--accent) }
+.ai-messages { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px }
+.ai-empty { margin:auto; text-align:center; color:var(--muted); font-size:12.5px; line-height:1.7; padding:0 18px }
+.ai-empty-icon { font-size:26px; margin-bottom:6px }
+.ai-hints { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:12px }
+.ai-hint { font-size:12px; padding:6px 12px; border-radius:99px; background:var(--bg); border:1px solid var(--line); color:var(--ink) }
+.ai-msg { max-width:86%; padding:9px 12px; border-radius:14px; font-size:13px; line-height:1.65; white-space:pre-wrap; word-break:break-word }
+.ai-msg.user { align-self:flex-end; background:var(--accent); color:#fff; border-bottom-right-radius:4px }
+.ai-msg.bot { align-self:flex-start; background:var(--bg); border-bottom-left-radius:4px }
+.ai-msg.thinking { color:var(--muted) }
+.ai-input { display:flex; gap:8px; padding:12px; border-top:1px solid var(--line) }
+.ai-input input { flex:1; min-width:0; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:var(--bg); font:inherit; color:var(--ink); outline:none }
+.ai-input input:focus { border-color:var(--accent) }
+.ai-input .btn { flex:none }
+.ai-model-row { display:flex; gap:8px }
+.ai-model-row select { flex:1; min-width:0 }
+.ai-config-status { font-size:12px; color:var(--muted); min-height:16px; display:block; margin-top:8px }
+
+/* ===== 外观主题切换 ===== */
+.theme-options { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px }
+.theme-options button { display:grid; justify-items:center; gap:4px; padding:12px 8px; border-radius:12px; border:1px solid var(--line); background:var(--card); font-size:12px; color:var(--muted) }
+.theme-options button span { font-size:18px; line-height:1 }
+.theme-options button.active { border-color:var(--accent); color:var(--accent); background:var(--accent-soft) }
+
+/* 下拉框与输入框统一质感 */
+.field select, .ai-model-row select { width:100%; padding:10px 12px; border-radius:9px; border:1px solid var(--line); background:var(--bg); font:inherit; color:var(--ink); outline:none }
+.field select:focus, .ai-model-row select:focus { border-color:var(--accent) }
+
+/* ===== 夜间模式 ===== */
+[data-theme="dark"] {
+  --bg:#0e1311;
+  --ink:#e8efeb;
+  --muted:#8d9a93;
+  --line:#26312b;
+  --card:#151d19;
+  --accent:#22a68b;
+  --accent-soft:#1b312a;
+  --orange:#e6904c;
+  --orange-soft:#38281a;
+  --shadow:0 10px 30px rgba(0,0,0,.45);
+  color-scheme:dark
+}
+[data-theme="dark"] body { background:#0e1311 }
+[data-theme="dark"] .btn { background:#1c2622; color:#c9d6cf }
+[data-theme="dark"] .btn.primary { background:var(--accent); color:#04120d }
+[data-theme="dark"] .btn.danger { background:#33201b; color:#e08a76 }
+[data-theme="dark"] .btn.logout { background:transparent!important; color:#8d9a93!important }
+[data-theme="dark"] .card, [data-theme="dark"] .settings-card { border-color:#232e28 }
+[data-theme="dark"] .settings-version { background:linear-gradient(135deg,#16201c,#101815) }
+[data-theme="dark"] .field input, [data-theme="dark"] .field select, [data-theme="dark"] .ai-model-row select,
+[data-theme="dark"] .device-search, [data-theme="dark"] .ai-input input, [data-theme="dark"] .auth-field input { background:#0f1714; border-color:#2a3630; color:var(--ink) }
+[data-theme="dark"] .modal-box, [data-theme="dark"] .toast { background:#1a2420; color:var(--ink) }
+[data-theme="dark"] .auth-gate { background:#0e1311 }
+[data-theme="dark"] .auth-card { background:#151d19; border-color:#232e28 }
+[data-theme="dark"] .auth-card-foot { border-color:#232e28 }
+[data-theme="dark"] .auth-field input { background:#0f1714 }
+[data-theme="dark"] .device-item, [data-theme="dark"] .environment-slot, [data-theme="dark"] .picker-option,
+[data-theme="dark"] .quick-grid button, [data-theme="dark"] .ai-hint, [data-theme="dark"] .ai-msg.bot { background:#1a2420 }
+[data-theme="dark"] .quick-grid button.on { background:var(--accent-soft); border-color:var(--accent) }
+[data-theme="dark"] .weather-day, [data-theme="dark"] .countdown-item, [data-theme="dark"] .countdown-setting-row { background:#101815 }
+[data-theme="dark"] .mobile-nav { background:rgba(21,29,25,.94) }
+[data-theme="dark"] .app-loader { background:#0e1311; color:var(--muted) }
+[data-theme="dark"] .hero .temp span, [data-theme="dark"] .home-title { color:var(--ink) }
+[data-theme="dark"] .detail-state { background:#101815 }
+[data-theme="dark"] .detail-attrs div { border-color:#232e28 }
+[data-theme="dark"] .energy .bar { background:#1a2420 }
+[data-theme="dark"] .habit-grid .day { background:#1a2420; border-color:#232e28 }

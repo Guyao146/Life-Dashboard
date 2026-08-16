@@ -126,6 +126,37 @@ window.LIFE_HUB_CONFIG = {
 
 ---
 
+## 🔑 本地账号密码登录（可选）
+
+登录卡片在 OAuth 按钮上方提供账号密码登录，**纯前端 PBKDF2-SHA256 校验**，不需要任何后端服务，适合静态托管。
+
+在 `config.js` 中配置 `localAuth`：
+
+```javascript
+localAuth: {
+  username: "admin",
+  pbkdf2: {
+    salt: "base64 盐",
+    hash: "base64 密码哈希",
+    iterations: 310000,
+  },
+},
+```
+
+生成新的密码哈希：在任意 HTTPS 页面（或 localhost）的浏览器控制台运行：
+
+```javascript
+const s = crypto.getRandomValues(new Uint8Array(16));
+const k = await crypto.subtle.importKey('raw', new TextEncoder().encode('你的密码'), 'PBKDF2', false, ['deriveBits']);
+const b = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: s, iterations: 310000 }, k, 256);
+const e = a => btoa(String.fromCharCode(...a));
+JSON.stringify({ salt: e(s), hash: e(new Uint8Array(b)), iterations: 310000 });
+```
+
+> ⚠️ 本地登录属于体验层门槛：哈希会随 `config.js` 下发到浏览器，无法抵御能读取源码的访问者。真正的访问控制请依赖 Authentik OAuth 与受保护的部署环境。本地登录同样要求 HTTPS（localhost 除外）。
+
+---
+
 # 🗺️ Roadmap
 
 - [x] 基础生活数据展示
