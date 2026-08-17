@@ -6,6 +6,13 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [0.5.8] - 2026-08-17
+
+### 修复
+
+- 版本检查改为调用同域 PHP 接口，由服务器通过 Git 读取 `origin/main:version.js`，消除 GitHub Raw 429、CDN 503 和不存在的 `master` 分支 404。
+- 增加 5 分钟服务器端版本缓存，避免页面刷新时频繁执行远端 Git 检查。
+
 ## [0.5.7] - 2026-08-17
 
 ### 修复
@@ -53,6 +60,7 @@
 - 恢复 Authentik 公共客户端配置的默认加载，私有 `config.js` 缺失时仍可登录。
 - 登录配置加载前禁用登录按钮，并在配置异常时显示明确错误。
 
+[0.5.8]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.8
 [0.5.7]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.7
 [0.5.6]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.6
 [0.5.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.0

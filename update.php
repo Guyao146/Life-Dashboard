@@ -51,9 +51,9 @@ function updateMode(): string
     return in_array($mode, ['auto', 'token'], true) ? $mode : 'token';
 }
 
-function isUpdateCommand(): bool
+function requestCommand(): string
 {
-    return hash_equals('update', trim((string) ($_SERVER['HTTP_X_LIFE_HUB_UPDATE_COMMAND'] ?? '')));
+    return strtolower(trim((string) ($_SERVER['HTTP_X_LIFE_HUB_UPDATE_COMMAND'] ?? '')));
 }
 
 function requestIsSameOrigin(): bool
@@ -92,6 +92,36 @@ function runGit(string $repository, string $command): array
     ];
 }
 
+function versionCachePath(string $repository, string $branch): string
+{
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . DIRECTORY_SEPARATOR
+        . 'life-hub-version-' . hash('sha256', $repository . ':' . $branch) . '.json';
+}
+
+function readVersionCache(string $path, int $maxAge = 300): ?array
+{
+    $modifiedAt = @filemtime($path);
+    if ($modifiedAt === false || time() - $modifiedAt > $maxAge) {
+        return null;
+    }
+
+    $decoded = json_decode((string) @file_get_contents($path), true);
+    if (!is_array($decoded) || !isset($decoded['remoteVersion'])) {
+        return null;
+    }
+
+    return $decoded;
+}
+
+function parseReleaseVersion(string $source): string
+{
+    if (preg_match('/version:\s*[\'\"](\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)[\'\"]/', $source, $match) !== 1) {
+        throw new RuntimeException('远端 version.js 中没有有效的语义化版本号');
+    }
+    return $match[1];
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     respond(405, ['ok' => false, 'error' => '升级接口只接受 POST 请求']);
 }
@@ -100,12 +130,13 @@ if (!requestIsSameOrigin()) {
     respond(403, ['ok' => false, 'error' => '跨站请求被拒绝']);
 }
 
-$mode = updateMode();
-if (!isUpdateCommand()) {
-    respond(400, ['ok' => false, 'error' => '缺少升级指令']);
+$command = requestCommand();
+if (!in_array($command, ['check', 'update'], true)) {
+    respond(400, ['ok' => false, 'error' => '指令必须为 check 或 update']);
 }
 
-if ($mode === 'token') {
+$mode = updateMode();
+if ($command === 'update' && $mode === 'token') {
     $configured = configuredToken();
     if ($configured === '') {
         respond(503, ['ok' => false, 'requiresToken' => true, 'error' => '服务器未配置 LIFE_HUB_UPDATE_TOKEN']);
@@ -113,6 +144,20 @@ if ($mode === 'token') {
     $provided = requestToken();
     if ($provided === '' || !hash_equals($configured, $provided)) {
         respond(401, ['ok' => false, 'requiresToken' => true, 'error' => '升级密钥无效']);
+    }
+}
+
+$repository = __DIR__;
+$branch = getenv('LIFE_HUB_UPDATE_BRANCH') ?: 'main';
+if (!preg_match('/^[A-Za-z0-9._\/-]+$/', $branch)) {
+    respond(500, ['ok' => false, 'error' => '升级分支配置无效']);
+}
+
+$versionCache = versionCachePath($repository, $branch);
+if ($command === 'check') {
+    $cached = readVersionCache($versionCache);
+    if ($cached !== null) {
+        respond(200, ['ok' => true, 'cached' => true] + $cached);
     }
 }
 
@@ -126,31 +171,41 @@ if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
 }
 
 try {
-    $repository = __DIR__;
-    $branch = getenv('LIFE_HUB_UPDATE_BRANCH') ?: 'main';
-    if (!preg_match('/^[A-Za-z0-9._\/-]+$/', $branch)) {
-        throw new RuntimeException('升级分支配置无效');
-    }
-
     // 固定 Git 子命令和分支，避免把浏览器输入拼进 shell 命令。
     $fetch = runGit($repository, 'git fetch --quiet origin ' . escapeshellarg($branch));
     if ($fetch['exitCode'] !== 0) {
         throw new RuntimeException('Git fetch 失败：' . ($fetch['output'] ?: '未知错误'));
     }
 
-    $pull = runGit($repository, 'git pull --ff-only origin ' . escapeshellarg($branch));
-    if ($pull['exitCode'] !== 0) {
-        throw new RuntimeException('Git pull 失败：' . ($pull['output'] ?: '本地分支可能存在未推送提交或冲突'));
+    if ($command === 'check') {
+        $remoteFile = runGit($repository, 'git show ' . escapeshellarg('origin/' . $branch . ':version.js'));
+        if ($remoteFile['exitCode'] !== 0) {
+            throw new RuntimeException('无法读取远端 version.js：' . ($remoteFile['output'] ?: '未知错误'));
+        }
+        $remoteVersion = parseReleaseVersion($remoteFile['output']);
+        $cachePayload = [
+            'remoteVersion' => $remoteVersion,
+            'branch' => $branch,
+            'checkedAt' => gmdate('c'),
+        ];
+        @file_put_contents($versionCache, json_encode($cachePayload, JSON_UNESCAPED_SLASHES), LOCK_EX);
+        $responseStatus = 200;
+        $responsePayload = ['ok' => true, 'cached' => false] + $cachePayload;
+    } else {
+        $pull = runGit($repository, 'git pull --ff-only origin ' . escapeshellarg($branch));
+        if ($pull['exitCode'] !== 0) {
+            throw new RuntimeException('Git pull 失败：' . ($pull['output'] ?: '本地分支可能存在未推送提交或冲突'));
+        }
+        @unlink($versionCache);
+        $head = runGit($repository, 'git rev-parse --short HEAD');
+        $responseStatus = 200;
+        $responsePayload = [
+            'ok' => true,
+            'message' => '升级完成',
+            'commit' => $head['exitCode'] === 0 ? trim($head['output']) : null,
+            'output' => function_exists('mb_substr') ? mb_substr($pull['output'], -2000) : substr($pull['output'], -2000),
+        ];
     }
-
-    $head = runGit($repository, 'git rev-parse --short HEAD');
-    $responseStatus = 200;
-    $responsePayload = [
-        'ok' => true,
-        'message' => '升级完成',
-        'commit' => $head['exitCode'] === 0 ? trim($head['output']) : null,
-        'output' => function_exists('mb_substr') ? mb_substr($pull['output'], -2000) : substr($pull['output'], -2000),
-    ];
 } catch (Throwable $error) {
     $responseStatus = 500;
     $responsePayload = ['ok' => false, 'error' => $error->getMessage()];

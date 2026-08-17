@@ -237,6 +237,8 @@ LIFE_HUB_UPDATE_BRANCH="main"
 
 `update.php` 只接受同源 POST、校验升级指令，并且只允许拉取 `LIFE_HUB_UPDATE_BRANCH` 指定的分支（默认 `main`），同时使用文件锁防止并发升级。升级密钥不会写入仓库，也不会下发到页面；不要把它放进 `config.js`。
 
+前端版本检查同样通过 `update.php` 完成。PHP 每 5 分钟最多执行一次 `git fetch`，并直接读取 `origin/<分支>:version.js`；浏览器不会再请求 GitHub Raw 或 CDN，因此不受浏览器侧 CORS、429 和 CDN 暂时故障影响。
+
 ```bash
 # 修复问题：0.3.0 -> 0.3.1
 php scripts/bump_version.php patch
