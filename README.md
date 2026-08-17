@@ -209,6 +209,34 @@ JSON.stringify({ salt: e(s), hash: e(new Uint8Array(b)), iterations: 310000 });
 项目遵循语义化版本；每次更新产品代码时，必须同步升级版本号并填写 `CHANGELOG.md`。
 发布辅助工具使用 PHP 8 CLI，不依赖 Python 或 Node.js。
 
+### PHP 8.2 一键升级（可选）
+
+如果站点目录本身就是 Git 工作区，并且 PHP-FPM/Apache 用户有权限执行 Git，可以启用设置页的“升级到远端”：
+
+1. 将根目录的 `update.php` 暴露在与看板相同的域名下；
+2. 推荐使用密钥模式，在服务器环境变量中设置：
+
+   ```bash
+   LIFE_HUB_UPDATE_TOKEN="请替换为至少 32 位随机字符串"
+   LIFE_HUB_UPDATE_MODE="token"
+   LIFE_HUB_UPDATE_BRANCH="main"
+   ```
+
+3. 确保服务器已经配置 GitHub 仓库的读取凭证（公开仓库可直接使用 HTTPS，私有仓库建议使用只读 Deploy Key）；
+4. 确保 PHP 用户对站点目录、`.git` 以及创建临时锁文件有读写权限，并允许 PHP 使用 `proc_open` 执行 `git`；
+5. 在设置 → 版本与更新中点击“检查更新”。检测到远端版本更高时，点击“升级到 vX.Y.Z”，输入上述密钥即可执行 `git fetch` + `git pull --ff-only`。
+
+如果你明确希望“前端点升级就直接拉取”，可以改成无密钥模式：
+
+```bash
+LIFE_HUB_UPDATE_MODE="auto"
+LIFE_HUB_UPDATE_BRANCH="main"
+```
+
+`auto` 模式不需要输入密钥，但任何能访问 `update.php` 的人都可以触发一次固定分支的升级。因此建议把 `update.php` 放到反向代理的访问控制后面；否则请使用推荐的 `token` 模式。
+
+`update.php` 只接受同源 POST、校验升级指令，并且只允许拉取 `LIFE_HUB_UPDATE_BRANCH` 指定的分支（默认 `main`），同时使用文件锁防止并发升级。升级密钥不会写入仓库，也不会下发到页面；不要把它放进 `config.js`。
+
 ```bash
 # 修复问题：0.3.0 -> 0.3.1
 php scripts/bump_version.php patch

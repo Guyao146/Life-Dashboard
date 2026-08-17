@@ -1570,6 +1570,8 @@ main {
 .settings-version>strong { color:var(--accent); font:600 17px 'DM Mono',monospace; letter-spacing:-.04em }
 .version-actions { display:flex; gap:8px }
 .version-actions .btn { flex:1; display:flex; align-items:center; justify-content:center; text-align:center; padding:9px 10px; font-size:12px; text-decoration:none }
+.version-actions .update-action { background:#d97a3f; color:#fff }
+.version-actions .update-action:hover { background:#c96930 }
 .version-status { min-height:16px; color:var(--muted); font-size:11px }
 .version-status:before { content:'●'; color:var(--accent); margin-right:5px }
 .version-actions button:disabled { cursor:wait; opacity:.65 }
