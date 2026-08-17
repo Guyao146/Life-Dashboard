@@ -99,7 +99,7 @@
 ## 下载项目
 
 ```bash
-git clone https://github.com/Guyao146/life-dashboard.git
+git clone https://github.com/Guyao146/Life-Dashboard.git
 ```
 
 ---

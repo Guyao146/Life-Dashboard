@@ -6,6 +6,12 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [0.5.7] - 2026-08-17
+
+### 修复
+
+- 将版本检查、GitHub 按钮和发布链接统一切换到迁移后的 `Guyao146/Life-Dashboard` 仓库，避免继续读取旧仓库的 `0.4.0`。
+
 ## [0.5.6] - 2026-08-17
 
 ### 新增
@@ -47,6 +53,8 @@
 - 恢复 Authentik 公共客户端配置的默认加载，私有 `config.js` 缺失时仍可登录。
 - 登录配置加载前禁用登录按钮，并在配置异常时显示明确错误。
 
-[0.5.0]: https://github.com/Guyao146/homeassistant-web/releases/tag/v0.5.0
-[0.4.0]: https://github.com/Guyao146/homeassistant-web/releases/tag/v0.4.0
-[0.3.0]: https://github.com/Guyao146/homeassistant-web/releases/tag/v0.3.0
+[0.5.7]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.7
+[0.5.6]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.6
+[0.5.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.0
+[0.4.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.4.0
+[0.3.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.3.0

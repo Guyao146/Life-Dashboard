@@ -95,7 +95,7 @@ if (preg_match('/^## \[/m', $changelog, $headingMatch, PREG_OFFSET_CAPTURE) === 
 } else {
     $changelog = rtrim($changelog) . "\n\n{$insertion}";
 }
-$changelog .= "\n[{$targetVersion}]: https://github.com/Guyao146/homeassistant-web/releases/tag/v{$targetVersion}\n";
+$changelog .= "\n[{$targetVersion}]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v{$targetVersion}\n";
 writeFileOrFail($changelogFile, $changelog);
 
 echo "版本已从 {$currentVersion} 升级到 {$targetVersion}" . PHP_EOL;

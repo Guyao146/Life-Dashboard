@@ -2,7 +2,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     const release=window.LIFE_HUB_RELEASE;
     const releaseLabel=release?.version?`v${release.version}${release.releasedAt?` · ${release.releasedAt}`:''}`:'版本信息缺失';
     document.querySelectorAll('[data-app-version]').forEach(element=>{element.textContent=releaseLabel});
-    const projectUrl='https://github.com/Guyao146/homeassistant-web',versionSources=['https://raw.githubusercontent.com/Guyao146/homeassistant-web/main/version.js','https://cdn.jsdelivr.net/gh/Guyao146/homeassistant-web@main/version.js','https://raw.githubusercontent.com/Guyao146/homeassistant-web/master/version.js'];
+    const projectUrl='https://github.com/Guyao146/Life-Dashboard',versionSources=['https://raw.githubusercontent.com/Guyao146/Life-Dashboard/main/version.js','https://cdn.jsdelivr.net/gh/Guyao146/Life-Dashboard@main/version.js','https://raw.githubusercontent.com/Guyao146/Life-Dashboard/master/version.js'];
     let OIDC=null;
     let LOCAL=null;
     const redirectUri=location.origin+location.pathname;
