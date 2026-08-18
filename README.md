@@ -211,7 +211,7 @@ JSON.stringify({ salt: e(s), hash: e(new Uint8Array(b)), iterations: 310000 });
 
 ### PHP 8.2 一键升级（可选）
 
-如果站点目录本身就是 Git 工作区，并且 PHP-FPM/Apache 用户有权限执行 Git，可以启用设置页的“升级到远端”：
+站点目录无需是 Git 工作区。`update.php` 会在 PHP 系统临时目录维护一个远端浅克隆，并把其中的产品文件部署到站点目录：
 
 1. 将根目录的 `update.php` 暴露在与看板相同的域名下；
 2. 推荐使用密钥模式，在服务器环境变量中设置：
@@ -220,11 +220,12 @@ JSON.stringify({ salt: e(s), hash: e(new Uint8Array(b)), iterations: 310000 });
    LIFE_HUB_UPDATE_TOKEN="请替换为至少 32 位随机字符串"
    LIFE_HUB_UPDATE_MODE="token"
    LIFE_HUB_UPDATE_BRANCH="main"
+   LIFE_HUB_UPDATE_REPOSITORY="https://github.com/Guyao146/Life-Dashboard.git"
    ```
 
 3. 确保服务器已经配置 GitHub 仓库的读取凭证（公开仓库可直接使用 HTTPS，私有仓库建议使用只读 Deploy Key）；
-4. 确保 PHP 用户对站点目录与 `.git` 有执行升级所需的读写权限、PHP 系统临时目录可写，并允许 PHP 使用 `proc_open` 执行 `git`；
-5. 在设置 → 版本与更新中点击“检查更新”。检测到远端版本更高时，点击“升级到 vX.Y.Z”，输入上述密钥即可执行 `git fetch` + `git pull --ff-only`。
+4. 确保 PHP 用户可写 PHP 系统临时目录；执行升级时还需能写站点目录，并允许 PHP 使用 `proc_open` 执行 `git`；
+5. 在设置 → 版本与更新中点击“检查更新”。检测到远端版本更高时，点击“升级到 vX.Y.Z”，PHP 会刷新临时浅克隆并部署文件。服务器本地的 `config.js`、`.env` 和 `.git` 不会被覆盖。
 
 如果你明确希望“前端点升级就直接拉取”，可以改成无密钥模式：
 
@@ -237,7 +238,7 @@ LIFE_HUB_UPDATE_BRANCH="main"
 
 `update.php` 只接受同源 POST、校验升级指令，并且只允许拉取 `LIFE_HUB_UPDATE_BRANCH` 指定的分支（默认 `main`），同时使用文件锁防止并发升级。升级密钥不会写入仓库，也不会下发到页面；不要把它放进 `config.js`。
 
-前端版本检查同样通过 `update.php` 完成。PHP 每 5 分钟最多执行一次 `git fetch`，并直接读取 `origin/<分支>:version.js`；浏览器不会再请求 GitHub Raw 或 CDN，因此不受浏览器侧 CORS、429 和 CDN 暂时故障影响。
+前端版本检查同样通过 `update.php` 完成。PHP 每 5 分钟最多刷新一次临时浅克隆并读取其中的 `version.js`；浏览器不会再请求 GitHub Raw 或 CDN，因此不受浏览器侧 CORS、429 和 CDN 暂时故障影响。
 
 ```bash
 # 修复问题：0.3.0 -> 0.3.1

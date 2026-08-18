@@ -106,13 +106,116 @@ function updateLockPath(string $repository, string $branch): string
         . 'life-hub-update-' . hash('sha256', $repository . ':' . $branch) . '.lock';
 }
 
-function remoteVersionFromGit(string $repository, string $branch): string
+function sourceCheckoutPath(string $repository, string $branch): string
 {
-    $remoteFile = runGit($repository, 'git show ' . escapeshellarg('origin/' . $branch . ':version.js'));
-    if ($remoteFile['exitCode'] !== 0) {
-        throw new RuntimeException('无法读取远端 version.js：' . ($remoteFile['output'] ?: '未知错误'));
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . DIRECTORY_SEPARATOR
+        . 'life-hub-source-' . hash('sha256', $repository . ':' . $branch);
+}
+
+function repositoryUrl(): string
+{
+    $configured = trim((string) (getenv('LIFE_HUB_UPDATE_REPOSITORY') ?: ''));
+    return $configured !== '' ? $configured : 'https://github.com/Guyao146/Life-Dashboard.git';
+}
+
+function removeDirectory(string $path): void
+{
+    if (!file_exists($path)) {
+        return;
     }
-    return parseReleaseVersion($remoteFile['output']);
+    if (is_link($path) || is_file($path)) {
+        @unlink($path);
+        return;
+    }
+    foreach (scandir($path) ?: [] as $name) {
+        if ($name !== '.' && $name !== '..') {
+            removeDirectory($path . DIRECTORY_SEPARATOR . $name);
+        }
+    }
+    @rmdir($path);
+}
+
+function refreshSourceCheckout(string $checkout, string $remote, string $branch): string
+{
+    if (!is_dir($checkout . DIRECTORY_SEPARATOR . '.git')) {
+        removeDirectory($checkout);
+        $clone = runGit(
+            sys_get_temp_dir(),
+            'git clone --quiet --depth 1 --single-branch --branch '
+                . escapeshellarg($branch) . ' ' . escapeshellarg($remote) . ' ' . escapeshellarg($checkout)
+        );
+        if ($clone['exitCode'] !== 0) {
+            throw new RuntimeException('Git 浅克隆失败：' . ($clone['output'] ?: '未知错误'));
+        }
+    } else {
+        $setRemote = runGit($checkout, 'git remote set-url origin ' . escapeshellarg($remote));
+        if ($setRemote['exitCode'] !== 0) {
+            throw new RuntimeException('更新远端地址失败：' . ($setRemote['output'] ?: '未知错误'));
+        }
+        $fetch = runGit($checkout, 'git fetch --quiet --depth 1 origin ' . escapeshellarg($branch));
+        if ($fetch['exitCode'] !== 0) {
+            throw new RuntimeException('Git fetch 失败：' . ($fetch['output'] ?: '未知错误'));
+        }
+        $reset = runGit($checkout, 'git reset --quiet --hard FETCH_HEAD');
+        if ($reset['exitCode'] !== 0) {
+            throw new RuntimeException('更新临时工作树失败：' . ($reset['output'] ?: '未知错误'));
+        }
+        runGit($checkout, 'git clean -quiet -fdx');
+    }
+
+    $head = runGit($checkout, 'git rev-parse --short HEAD');
+    return $head['exitCode'] === 0 ? trim($head['output']) : '';
+}
+
+function remoteVersionFromCheckout(string $checkout): string
+{
+    $versionFile = $checkout . DIRECTORY_SEPARATOR . 'version.js';
+    $source = @file_get_contents($versionFile);
+    if ($source === false) {
+        throw new RuntimeException('临时远端工作树中缺少 version.js');
+    }
+    return parseReleaseVersion($source);
+}
+
+function deployCheckout(string $source, string $target, string $relative = ''): int
+{
+    $count = 0;
+    $preservedRootFiles = ['config.js', '.env'];
+    foreach (scandir($source) ?: [] as $name) {
+        if ($name === '.' || $name === '..' || $name === '.git') {
+            continue;
+        }
+        if ($relative === '' && in_array($name, $preservedRootFiles, true)) {
+            continue;
+        }
+
+        $sourcePath = $source . DIRECTORY_SEPARATOR . $name;
+        $targetPath = $target . DIRECTORY_SEPARATOR . $name;
+        $nextRelative = $relative === '' ? $name : $relative . '/' . $name;
+        if (is_link($sourcePath)) {
+            throw new RuntimeException("拒绝部署符号链接：{$nextRelative}");
+        }
+        if (is_dir($sourcePath)) {
+            if (!is_dir($targetPath) && !@mkdir($targetPath, 0755, true) && !is_dir($targetPath)) {
+                throw new RuntimeException("无法创建部署目录：{$nextRelative}");
+            }
+            $count += deployCheckout($sourcePath, $targetPath, $nextRelative);
+            continue;
+        }
+
+        $temporary = $targetPath . '.life-hub-' . bin2hex(random_bytes(4)) . '.tmp';
+        if (!@copy($sourcePath, $temporary)) {
+            throw new RuntimeException("无法写入部署文件：{$nextRelative}");
+        }
+        @chmod($temporary, 0644);
+        if (!@rename($temporary, $targetPath)) {
+            @unlink($temporary);
+            throw new RuntimeException("无法替换部署文件：{$nextRelative}");
+        }
+        $count++;
+    }
+    return $count;
 }
 
 function readVersionCache(string $path, int $maxAge = 300): ?array
@@ -168,6 +271,8 @@ $branch = getenv('LIFE_HUB_UPDATE_BRANCH') ?: 'main';
 if (!preg_match('/^[A-Za-z0-9._\/-]+$/', $branch)) {
     respond(500, ['ok' => false, 'error' => '升级分支配置无效']);
 }
+$remote = repositoryUrl();
+$checkout = sourceCheckoutPath($repository, $branch);
 
 $versionCache = versionCachePath($repository, $branch);
 if ($command === 'check') {
@@ -192,8 +297,8 @@ if (!$hasLock && $command === 'check') {
     }
     if (!$hasLock) {
         try {
-            // Git fetch 正忙时读取服务器已有的 origin/<branch> 引用，避免把检查误报为 409。
-            $remoteVersion = remoteVersionFromGit($repository, $branch);
+            // 临时克隆正在刷新时读取上一份完整工作树，避免把检查误报为 409。
+            $remoteVersion = remoteVersionFromCheckout($checkout);
             fclose($lock);
             respond(200, [
                 'ok' => true,
@@ -217,14 +322,11 @@ if (!$hasLock) {
 }
 
 try {
-    // 固定 Git 子命令和分支，避免把浏览器输入拼进 shell 命令。
-    $fetch = runGit($repository, 'git fetch --quiet origin ' . escapeshellarg($branch));
-    if ($fetch['exitCode'] !== 0) {
-        throw new RuntimeException('Git fetch 失败：' . ($fetch['output'] ?: '未知错误'));
-    }
+    // 站点目录无需是 Git 工作区；远端代码只在 PHP 临时目录中维护。
+    $commit = refreshSourceCheckout($checkout, $remote, $branch);
 
     if ($command === 'check') {
-        $remoteVersion = remoteVersionFromGit($repository, $branch);
+        $remoteVersion = remoteVersionFromCheckout($checkout);
         $cachePayload = [
             'remoteVersion' => $remoteVersion,
             'branch' => $branch,
@@ -234,18 +336,15 @@ try {
         $responseStatus = 200;
         $responsePayload = ['ok' => true, 'cached' => false] + $cachePayload;
     } else {
-        $pull = runGit($repository, 'git pull --ff-only origin ' . escapeshellarg($branch));
-        if ($pull['exitCode'] !== 0) {
-            throw new RuntimeException('Git pull 失败：' . ($pull['output'] ?: '本地分支可能存在未推送提交或冲突'));
-        }
+        $files = deployCheckout($checkout, $repository);
         @unlink($versionCache);
-        $head = runGit($repository, 'git rev-parse --short HEAD');
         $responseStatus = 200;
         $responsePayload = [
             'ok' => true,
             'message' => '升级完成',
-            'commit' => $head['exitCode'] === 0 ? trim($head['output']) : null,
-            'output' => function_exists('mb_substr') ? mb_substr($pull['output'], -2000) : substr($pull['output'], -2000),
+            'commit' => $commit !== '' ? $commit : null,
+            'files' => $files,
+            'output' => "已部署 {$files} 个文件，并保留 config.js 与 .env",
         ];
     }
 } catch (Throwable $error) {

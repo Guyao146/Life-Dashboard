@@ -6,6 +6,13 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [0.5.10] - 2026-08-18
+
+### 修复
+
+- 更新器改为在 PHP 系统临时目录维护 GitHub 浅克隆，版本检查与升级不再要求 Web 站点目录包含 `.git`。
+- 无 Git 部署升级时原子覆盖产品文件，并保留服务器本地的 `config.js`、`.env` 与现有 `.git` 目录。
+
 ## [0.5.9] - 2026-08-18
 
 ### 修复
@@ -68,6 +75,7 @@
 - 恢复 Authentik 公共客户端配置的默认加载，私有 `config.js` 缺失时仍可登录。
 - 登录配置加载前禁用登录按钮，并在配置异常时显示明确错误。
 
+[0.5.10]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.10
 [0.5.9]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.9
 [0.5.8]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.8
 [0.5.7]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.7
