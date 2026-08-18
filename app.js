@@ -7,6 +7,8 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     let LOCAL=null;
     const redirectUri=location.origin+location.pathname;
     let HA=null;
+    function ensureAdminStatus(){const card=$('#settings-connect')?.closest('.settings-card');if(!card)return null;let status=$('#admin-identity-status');if(!status){status=document.createElement('div');status.id='admin-identity-status';status.className='connection-note';card.querySelector('.settings-actions')?.before(status)}return status}
+    function renderAdminStatus(config){const status=ensureAdminStatus();if(!status)return;const identity=config?.identity||{},auth=config?.authorization||{},groups=Array.isArray(auth.groups)?auth.groups:[],allowed=Array.isArray(auth.allowedGroups)?auth.allowedGroups:[];status.textContent=`OIDC：${identity.username||identity.email||'未识别账号'} · ${auth.administrator?'管理员已匹配':'非管理员'} · 当前组：${groups.join('、')||'未收到 groups 声明'} · 允许组：${allowed.join('、')||'未配置'}`}
     async function loadRuntimeConfig(){
       const response=await fetch('config.php?action=public',{cache:'no-store'}),config=await response.json();
       if(!response.ok||!config.ok)throw new Error(config.error||`公开配置接口返回 HTTP ${response.status}`);
@@ -23,6 +25,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       const session=readSession('life-hub-oidc'),token=session?.access_token;
       if(!token)throw new Error('只有 Authentik 管理员登录可以加载 Home Assistant 私密配置');
       const response=await fetch('config.php?action=private',{cache:'no-store',headers:{Authorization:'Bearer '+token}}),config=await response.json();
+      renderAdminStatus(config);
       if(!response.ok||!config.ok)throw new Error(config.error||`私密配置接口返回 HTTP ${response.status}`);
       if(!config?.homeAssistant?.url||!config?.homeAssistant?.token)throw new Error('.env 中缺少 Home Assistant 配置');
       HA={...config.homeAssistant,url:String(config.homeAssistant.url).replace(/\/$/,'')};
@@ -139,6 +142,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     const updateMessage=sessionStorage.getItem('life-hub-update-message');if(updateMessage){sessionStorage.removeItem('life-hub-update-message');setTimeout(()=>notice(updateMessage),700)}
     function showModal(){modal.classList.add('show')} function hideModal(){modal.classList.remove('show')}
     $('#settings-connect').onclick=showModal; $('#cancel-connect').onclick=hideModal;
+    ensureAdminStatus().textContent='OIDC 管理员身份将在登录后检查';
     modal.addEventListener('click',e=>{if(e.target===modal)hideModal()});
     $('#quick-picker').onclick=()=>openPicker();$('#cancel-picker').onclick=()=>$('#picker-modal').classList.remove('show');$('#picker-modal').onclick=e=>{if(e.target===$('#picker-modal'))$('#picker-modal').classList.remove('show')};$('#save-picker').onclick=()=>{const ids=[...$('#picker-list').querySelectorAll('input:checked')].map(input=>input.value).slice(0,6);saveQuickIds(ids);renderQuick(latestStates);$('#picker-modal').classList.remove('show');notice('快捷控制已保存')};
     $('#close-detail').onclick=()=>$('#device-modal').classList.remove('show');$('#device-modal').onclick=e=>{if(e.target===$('#device-modal'))$('#device-modal').classList.remove('show')};$('#detail-control').onclick=()=>{if(selectedDetail)controlEntity(selectedDetail)};$('#device-search').oninput=()=>renderDevices(latestStates);

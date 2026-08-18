@@ -105,12 +105,25 @@ function isAdministrator(array $claims): bool
     $allowedUsers = allowList('LIFE_HUB_ADMIN_USERS');
     $allowedEmails = allowList('LIFE_HUB_ADMIN_EMAILS');
     if ($allowedGroups === [] && $allowedUsers === [] && $allowedEmails === []) return false;
-    $claimGroups = $claims['groups'] ?? [];
-    if (is_string($claimGroups)) $claimGroups = preg_split('/[,;\r\n]+/', $claimGroups) ?: [];
-    $groups = array_map('strtolower', array_map('strval', is_array($claimGroups) ? $claimGroups : []));
+    $groups = normalizedClaimGroups($claims);
     $username = strtolower(trim((string) ($claims['preferred_username'] ?? '')));
     $email = strtolower(trim((string) ($claims['email'] ?? '')));
     return array_intersect($allowedGroups, $groups) !== [] || ($username !== '' && in_array($username, $allowedUsers, true)) || ($email !== '' && in_array($email, $allowedEmails, true));
+}
+
+function normalizedClaimGroups(array $claims): array
+{
+    $raw = $claims['groups'] ?? $claims['ak_groups'] ?? [];
+    if (is_string($raw)) {
+        $decoded = json_decode($raw, true);
+        $raw = is_array($decoded) ? $decoded : (preg_split('/[,;\r\n]+/', $raw) ?: []);
+    }
+    if (!is_array($raw)) return [];
+    $groups = array_map(static function (mixed $group): string {
+        if (is_array($group)) $group = $group['name'] ?? $group['group_name'] ?? '';
+        return strtolower(trim((string) $group));
+    }, $raw);
+    return array_values(array_unique(array_filter($groups)));
 }
 
 function requestCommand(): string

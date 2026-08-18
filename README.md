@@ -131,7 +131,15 @@ LIFE_HUB_HA_TOKEN="Home Assistant 长期访问令牌"
 
 管理员可按 Authentik **组 / 用户名 / 邮箱** 任意一种白名单判定，多个值用逗号分隔。三种白名单全部为空时，后端默认拒绝所有私密配置请求。
 
-如果使用组白名单，请确认 Authentik 的 OAuth/OIDC Scope Mapping 会在 UserInfo 的 `groups` 字段中返回组名；否则请使用用户名或邮箱白名单。
+推荐在 Authentik 后台按组管理管理员：
+
+1. 在 **Directory → Groups** 创建 `Life Dashboard Admins`（也可使用其他名称）；
+2. 把需要管理看板和执行一键升级的 OIDC 用户加入该组；
+3. 在 Life Dashboard 服务器 `.env` 中填写完全相同的组名：`LIFE_HUB_ADMIN_GROUPS="Life Dashboard Admins"`；
+4. 在该应用的 OAuth2/OIDC Provider 中确认已选择 Authentik 默认的 **OpenID `profile` Scope Mapping**。应用登录时已请求 `profile`，UserInfo 应由该映射返回 `groups` 声明；
+5. 退出 Life Dashboard 后重新走一次 OIDC 登录，使新组成员关系进入新的 access token。
+
+登录后可在 **设置 → 连接与账户** 查看身份诊断，包括当前 OIDC 用户、UserInfo 返回的组、服务器允许的管理员组和最终匹配结果。如果“当前组”显示未收到声明，应先修复 Authentik Provider 的 Scope Mapping；如果两边组名不同，则修改 `.env` 或 Authentik 组名。
 
 配置加载流程：
 

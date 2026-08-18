@@ -6,6 +6,14 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [0.6.3] - 2026-08-18
+
+### 修复
+
+- 增强 Authentik 管理员组识别，兼容 `groups`、`ak_groups`、数组、JSON 字符串和组对象等 UserInfo 声明格式。
+- 在设置页显示当前 OIDC 用户、收到的组、允许的管理员组及匹配结果，便于排查 Scope Mapping 与组名配置。
+- 补充 Authentik 用户组、`profile` Scope Mapping 和重新登录的配置步骤。
+
 ## [0.6.2] - 2026-08-18
 
 ### 修复
@@ -99,6 +107,7 @@
 - 恢复 Authentik 公共客户端配置的默认加载，私有 `config.js` 缺失时仍可登录。
 - 登录配置加载前禁用登录按钮，并在配置异常时显示明确错误。
 
+[0.6.3]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.6.3
 [0.6.2]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.6.2
 [0.6.1]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.6.1
 [0.6.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.6.0

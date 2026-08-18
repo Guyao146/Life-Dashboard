@@ -158,20 +158,40 @@ function isAdministrator(array $claims, array $values): bool
     $allowedGroups = allowList($values, 'LIFE_HUB_ADMIN_GROUPS');
     $allowedUsers = allowList($values, 'LIFE_HUB_ADMIN_USERS');
     $allowedEmails = allowList($values, 'LIFE_HUB_ADMIN_EMAILS');
-    if ($allowedGroups === [] && $allowedUsers === [] && $allowedEmails === []) {
-        configRespond(503, ['ok' => false, 'error' => '服务器未配置管理员组、用户名或邮箱白名单']);
-    }
-
-    $claimGroups = $claims['groups'] ?? [];
-    if (is_string($claimGroups)) {
-        $claimGroups = preg_split('/[,;\r\n]+/', $claimGroups) ?: [];
-    }
-    $groups = array_map('strtolower', array_map('strval', is_array($claimGroups) ? $claimGroups : []));
+    $groups = normalizedClaimGroups($claims);
     $username = strtolower(trim((string) ($claims['preferred_username'] ?? '')));
     $email = strtolower(trim((string) ($claims['email'] ?? '')));
     return array_intersect($allowedGroups, $groups) !== []
         || ($username !== '' && in_array($username, $allowedUsers, true))
         || ($email !== '' && in_array($email, $allowedEmails, true));
+}
+
+function normalizedClaimGroups(array $claims): array
+{
+    $raw = $claims['groups'] ?? $claims['ak_groups'] ?? [];
+    if (is_string($raw)) {
+        $decoded = json_decode($raw, true);
+        $raw = is_array($decoded) ? $decoded : (preg_split('/[,;\r\n]+/', $raw) ?: []);
+    }
+    if (!is_array($raw)) {
+        return [];
+    }
+    $groups = array_map(static function (mixed $group): string {
+        if (is_array($group)) {
+            $group = $group['name'] ?? $group['group_name'] ?? '';
+        }
+        return strtolower(trim((string) $group));
+    }, $raw);
+    return array_values(array_unique(array_filter($groups)));
+}
+
+function authorizationDetails(array $claims, array $values): array
+{
+    return [
+        'administrator' => isAdministrator($claims, $values),
+        'groups' => normalizedClaimGroups($claims),
+        'allowedGroups' => allowList($values, 'LIFE_HUB_ADMIN_GROUPS'),
+    ];
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -208,22 +228,31 @@ if ($action === 'public') {
     configRespond(200, $payload);
 }
 
-if ($action !== 'private') {
-    configRespond(400, ['ok' => false, 'error' => 'action 必须为 public 或 private']);
+if (!in_array($action, ['private', 'identity'], true)) {
+    configRespond(400, ['ok' => false, 'error' => 'action 必须为 public、identity 或 private']);
 }
 
 $claims = fetchUserInfo(requiredEnv($values, 'LIFE_HUB_OIDC_USERINFO_URL'), bearerToken());
-if (!isAdministrator($claims, $values)) {
-    configRespond(403, ['ok' => false, 'error' => '当前 Authentik 账号不是看板管理员']);
+$identity = [
+    'username' => (string) ($claims['preferred_username'] ?? ''),
+    'email' => (string) ($claims['email'] ?? ''),
+];
+$authorization = authorizationDetails($claims, $values);
+if ($action === 'identity') {
+    configRespond(200, ['ok' => true, 'identity' => $identity, 'authorization' => $authorization]);
+}
+if (!$authorization['administrator']) {
+    $error = $authorization['allowedGroups'] === []
+        ? '服务器未配置 LIFE_HUB_ADMIN_GROUPS'
+        : '当前 Authentik 账号不在允许的管理员组中';
+    configRespond(403, ['ok' => false, 'error' => $error, 'identity' => $identity, 'authorization' => $authorization]);
 }
 
 configRespond(200, [
     'ok' => true,
     'administrator' => true,
-    'identity' => [
-        'username' => (string) ($claims['preferred_username'] ?? ''),
-        'email' => (string) ($claims['email'] ?? ''),
-    ],
+    'identity' => $identity,
+    'authorization' => $authorization,
     'homeAssistant' => [
         'url' => requiredEnv($values, 'LIFE_HUB_HA_URL'),
         'token' => requiredEnv($values, 'LIFE_HUB_HA_TOKEN'),
