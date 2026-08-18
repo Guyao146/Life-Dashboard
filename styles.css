@@ -2083,7 +2083,7 @@ main {
 [data-theme="dark"] ::-webkit-scrollbar-thumb { background:#2a3630 }
 [data-theme="dark"] .sidebar { background:transparent }
 [data-theme="dark"] .top .date b { color:var(--ink) }
-[data-theme="dark"] .agenda-row { background:#101815 }
+[data-theme="dark"] .agenda-row { background:transparent }
 [data-theme="dark"] .delivery .progress { background:#1a2420 }
 [data-theme="dark"] .stages b { color:var(--ink) }
 [data-theme="dark"] .ai-panel { box-shadow:0 24px 70px rgba(0,0,0,.55) }
