@@ -194,6 +194,59 @@ function authorizationDetails(array $claims, array $values): array
     ];
 }
 
+
+function fetchDshWorkspaces(array $values): array
+{
+    $baseUrl = requiredEnv($values, 'LIFE_HUB_DSH_URL');
+    $token = requiredEnv($values, 'LIFE_HUB_DSH_TOKEN');
+    if (strlen($token) < 24) {
+        configRespond(503, ['ok' => false, 'error' => 'LIFE_HUB_DSH_TOKEN 至少需要 24 个字符']);
+    }
+    if (filter_var($baseUrl, FILTER_VALIDATE_URL) === false || !in_array(parse_url($baseUrl, PHP_URL_SCHEME), ['http', 'https'], true)) {
+        configRespond(503, ['ok' => false, 'error' => 'LIFE_HUB_DSH_URL 必须是有效的 http/https 地址']);
+    }
+    if (parse_url($baseUrl, PHP_URL_USER) !== null || parse_url($baseUrl, PHP_URL_PASS) !== null) {
+        configRespond(503, ['ok' => false, 'error' => 'LIFE_HUB_DSH_URL 不允许包含账号或密码']);
+    }
+    $url = rtrim($baseUrl, '/') . '/dsh-activity/api/workspaces';
+    $timeout = max(2, min(15, (int) envValue($values, 'LIFE_HUB_DSH_TIMEOUT_SECONDS', '5')));
+    $body = '';
+    $status = 0;
+    if (function_exists('curl_init')) {
+        $curl = curl_init($url);
+        curl_setopt_array($curl, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => $timeout,
+            CURLOPT_TIMEOUT => $timeout,
+            CURLOPT_HTTPHEADER => ['Accept: application/json', 'X-DSH-Dashboard-Token: ' . $token],
+        ]);
+        $result = curl_exec($curl);
+        $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        $error = curl_error($curl);
+        curl_close($curl);
+        if ($result === false) configRespond(502, ['ok' => false, 'error' => '无法连接 DSH：' . $error]);
+        $body = (string) $result;
+    } else {
+        $context = stream_context_create(['http' => [
+            'method' => 'GET',
+            'timeout' => $timeout,
+            'ignore_errors' => true,
+            'header' => "Accept: application/json\r\nX-DSH-Dashboard-Token: {$token}\r\n",
+        ]]);
+        $result = @file_get_contents($url, false, $context);
+        $body = is_string($result) ? $result : '';
+        foreach ($http_response_header ?? [] as $header) {
+            if (preg_match('/^HTTP\/\S+\s+(\d{3})/', $header, $match) === 1) { $status = (int) $match[1]; break; }
+        }
+    }
+    $payload = json_decode($body, true);
+    if ($status !== 200 || !is_array($payload) || ($payload['ok'] ?? false) !== true || !is_array($payload['workspaces'] ?? null)) {
+        $message = is_array($payload) ? (string) ($payload['error'] ?? "HTTP {$status}") : "HTTP {$status}";
+        configRespond(502, ['ok' => false, 'error' => 'DSH 工作区接口失败：' . $message]);
+    }
+    return $payload;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     configRespond(405, ['ok' => false, 'error' => '配置接口只接受 GET 请求']);
 }
@@ -228,8 +281,8 @@ if ($action === 'public') {
     configRespond(200, $payload);
 }
 
-if (!in_array($action, ['private', 'identity'], true)) {
-    configRespond(400, ['ok' => false, 'error' => 'action 必须为 public、identity 或 private']);
+if (!in_array($action, ['private', 'identity', 'workspaces'], true)) {
+    configRespond(400, ['ok' => false, 'error' => 'action 必须为 public、identity、private 或 workspaces']);
 }
 
 $claims = fetchUserInfo(requiredEnv($values, 'LIFE_HUB_OIDC_USERINFO_URL'), bearerToken());
@@ -246,6 +299,10 @@ if (!$authorization['administrator']) {
         ? '服务器未配置 LIFE_HUB_ADMIN_GROUPS'
         : '当前 Authentik 账号不在允许的管理员组中';
     configRespond(403, ['ok' => false, 'error' => $error, 'identity' => $identity, 'authorization' => $authorization]);
+}
+
+if ($action === 'workspaces') {
+    configRespond(200, fetchDshWorkspaces($values));
 }
 
 configRespond(200, [

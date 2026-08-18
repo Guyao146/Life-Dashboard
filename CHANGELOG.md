@@ -6,6 +6,18 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [0.7.0] - 2026-08-18
+
+### 新增
+
+- 接入 dsh-activity-tracker 实时工作区状态，按工作中、活跃、最近活动、空闲和无数据区分项目。
+- 新增可开关、可调整大小、可拖拽排序的“工作区动态”组件，10 秒自动刷新并可展开查看会话、事件和 Token 汇总。
+- 工作区数据通过 Authentik 管理员鉴权后的 PHP 同源代理读取，DSH 地址和共享令牌仅保存在服务器 `.env`。
+
+### 安全
+
+- DSH 只读接口使用独立共享令牌和常量时间比较，不返回完整工作目录、用户输入、命令内容或认证信息。
+
 ## [0.6.3] - 2026-08-18
 
 ### 修复
@@ -119,3 +131,4 @@
 [0.5.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.3.0
+[0.7.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.7.0

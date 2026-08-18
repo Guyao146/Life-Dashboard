@@ -62,6 +62,34 @@
 让智能家居真正融入生活。
 
 
+## 💻 DSH 工作区动态
+
+生活看板可以连接 `dsh-activity-tracker 1.4.5+`，在总览中按工作区实时显示状态：工作中（2 分钟内）、活跃（15 分钟内）、最近活动（60 分钟内）、空闲或无数据。
+
+卡片每 10 秒自动刷新，支持手动刷新、展开详情、小/中/大尺寸、隐藏和拖拽排序；详情包含脱敏的最近会话 ID、近 15 分钟事件、今日活动、今日 Token 和会话数。
+
+### 配置
+
+1. 在 DSH 主机创建 `~/.dsh/dsh-activity-tracker-dashboard.json`：
+
+```json
+{
+  "token": "replace-with-a-random-32-byte-or-longer-secret"
+}
+```
+
+2. 在生活看板服务器 `.env` 使用同一令牌，并填写服务器可访问的 DSH 地址：
+
+```dotenv
+LIFE_HUB_DSH_URL="http://dsh-host:2712"
+LIFE_HUB_DSH_TOKEN="replace-with-a-random-32-byte-or-longer-secret"
+LIFE_HUB_DSH_TIMEOUT_SECONDS="5"
+```
+
+3. 重启 DSH 和生活看板服务。如果二者不在同一主机，不要将 DSH 地址写为 `127.0.0.1`。
+
+浏览器不会收到 DSH 地址或共享令牌。请求先经过 Authentik 管理员校验，再由 PHP 服务端代理；接口不返回完整工作目录、会话标题、用户输入或命令内容。
+
 # 📦 项目特点
 
 ### 🎨 极简可视化设计
