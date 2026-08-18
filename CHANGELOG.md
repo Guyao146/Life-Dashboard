@@ -6,6 +6,13 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [0.7.2] - 2026-08-19
+
+### 修复
+
+- 使用 Web Locks 对多个浏览器标签页的 OIDC Refresh Token 续期进行跨标签页互斥，避免旋转型 Refresh Token 被并发消费后误退出。
+- 续期收到 `invalid_grant` 时先检查其他标签页是否已经写入更新会话，不再错误清空有效登录。
+
 ## [0.7.1] - 2026-08-18
 
 ### 新增
@@ -146,3 +153,4 @@
 [0.3.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.3.0
 [0.7.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.7.0
 [0.7.1]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.7.1
+[0.7.2]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.7.2
