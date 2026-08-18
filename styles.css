@@ -2285,6 +2285,7 @@ main {
 .workspace-refresh { width:30px; height:30px; display:grid; place-items:center; padding:0; border:1px solid var(--line); border-radius:9px; background:var(--card); color:var(--muted); font-size:17px; cursor:pointer; transition:.18s }
 .workspace-refresh:hover { color:var(--accent); border-color:#b9ddd3; background:var(--accent-soft) }
 .workspace-refresh.is-spinning { animation:workspace-spin .8s linear infinite }
+.workspace-source-offline { color:#b56a16!important }
 .workspace-summary { display:flex; flex-wrap:wrap; gap:7px; margin:14px 0 10px }
 .workspace-summary span { display:inline-flex; align-items:center; gap:6px; padding:5px 9px; border:1px solid var(--line); border-radius:999px; background:var(--bg); color:var(--muted); font-size:11px }
 .workspace-summary b { color:var(--ink); font-variant-numeric:tabular-nums }

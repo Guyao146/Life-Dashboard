@@ -7,6 +7,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     let LOCAL=null;
     const redirectUri=location.origin+location.pathname;
     let HA=null;
+    const oidcSessionKey='life-hub-oidc';
     function ensureAdminStatus(){const card=$('#settings-connect')?.closest('.settings-card');if(!card)return null;let status=$('#admin-identity-status');if(!status){status=document.createElement('div');status.id='admin-identity-status';status.className='connection-note';card.querySelector('.settings-actions')?.before(status)}return status}
     function renderAdminStatus(config){const status=ensureAdminStatus();if(!status)return;const identity=config?.identity||{},auth=config?.authorization||{},groups=Array.isArray(auth.groups)?auth.groups:[],allowed=Array.isArray(auth.allowedGroups)?auth.allowedGroups:[];status.textContent=`OIDC：${identity.username||identity.email||'未识别账号'} · ${auth.administrator?'管理员已匹配':'非管理员'} · 当前组：${groups.join('、')||'未收到 groups 声明'} · 允许组：${allowed.join('、')||'未配置'}`}
     async function loadRuntimeConfig(){
@@ -22,9 +23,9 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       LOCAL=localAuth?.username&&localAuth?.pbkdf2?.salt&&localAuth?.pbkdf2?.hash?{username:String(localAuth.username),pbkdf2:{salt:localAuth.pbkdf2.salt,hash:localAuth.pbkdf2.hash,iterations:Number(localAuth.pbkdf2.iterations)||310000}}:null;
     }
     async function loadPrivateRuntimeConfig(){
-      const session=readSession('life-hub-oidc'),token=session?.access_token;
+      const session=await validOidcSession(),token=session?.access_token;
       if(!token)throw new Error('只有 Authentik 管理员登录可以加载 Home Assistant 私密配置');
-      const response=await fetch('config.php?action=private',{cache:'no-store',headers:{Authorization:'Bearer '+token}}),config=await response.json();
+      const response=await oidcFetch('config.php?action=private',{cache:'no-store'}),config=await response.json();
       renderAdminStatus(config);
       if(!response.ok||!config.ok)throw new Error(config.error||`私密配置接口返回 HTTP ${response.status}`);
       if(!config?.homeAssistant?.url||!config?.homeAssistant?.token)throw new Error('.env 中缺少 Home Assistant 配置');
@@ -40,28 +41,35 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       if(!window.isSecureContext)throw new Error('Authentik 登录需要 HTTPS 部署（localhost 除外）');
       const {verifier,challenge}=await pkce(),state=b64url(crypto.getRandomValues(new Uint8Array(20)));
       sessionStorage.setItem('life-hub-pkce',JSON.stringify({verifier,state}));
-      const p=new URLSearchParams({client_id:OIDC.clientId,response_type:'code',redirect_uri:redirectUri,scope:'openid profile email',state,code_challenge:challenge,code_challenge_method:'S256'});
+      const p=new URLSearchParams({client_id:OIDC.clientId,response_type:'code',redirect_uri:redirectUri,scope:'openid profile email offline_access',state,code_challenge:challenge,code_challenge_method:'S256'});
       location.assign(OIDC.authorize+'?'+p)
     }
     function enterDashboard(){
-      sessionStorage.setItem('life-hub-dashboard-access','true');
       $('#auth-gate').classList.add('hidden');
       $('#app-loader').classList.add('hidden')
     }
     function readSession(key){try{return JSON.parse(sessionStorage.getItem(key)||'null')}catch(err){sessionStorage.removeItem(key);return null}}
+    function readOidcSession(){try{const stored=JSON.parse(localStorage.getItem(oidcSessionKey)||'null');if(stored)return stored;const legacy=readSession(oidcSessionKey);if(legacy){localStorage.setItem(oidcSessionKey,JSON.stringify(legacy));sessionStorage.removeItem(oidcSessionKey)}return legacy}catch(err){localStorage.removeItem(oidcSessionKey);sessionStorage.removeItem(oidcSessionKey);return null}}
+    function clearOidcSession(){localStorage.removeItem(oidcSessionKey);sessionStorage.removeItem(oidcSessionKey);sessionStorage.removeItem('life-hub-dashboard-access')}
+    function saveOidcSession(tokens,previous=null){const now=Date.now(),rememberUntil=previous?.rememberUntil||now+(Number(OIDC?.rememberDays)||30)*86400000,next={...previous,...tokens,refresh_token:tokens.refresh_token||previous?.refresh_token||'',expiresAt:now+(Number(tokens.expires_in)||3600)*1000,rememberUntil};localStorage.setItem(oidcSessionKey,JSON.stringify(next));return next}
+    let oidcRefreshPromise=null;
+    async function refreshOidcSession(session){if(oidcRefreshPromise)return oidcRefreshPromise;oidcRefreshPromise=(async()=>{if(!session?.refresh_token||session.rememberUntil<=Date.now())throw new Error('登录已过期');const form=new URLSearchParams({grant_type:'refresh_token',client_id:OIDC.clientId,refresh_token:session.refresh_token});const response=await fetch(OIDC.token,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form});if(!response.ok)throw new Error('登录续期失败');const tokens=await response.json();if(!tokens?.access_token)throw new Error('续期结果缺少 access_token');return saveOidcSession(tokens,session)})().catch(error=>{clearOidcSession();throw error}).finally(()=>{oidcRefreshPromise=null});return oidcRefreshPromise}
+    async function validOidcSession(forceRefresh=false){const session=readOidcSession();if(!session||session.rememberUntil<=Date.now()){clearOidcSession();return null}if(!forceRefresh&&session.access_token&&session.expiresAt>Date.now()+60000)return session;try{return await refreshOidcSession(session)}catch(error){return null}}
+    function returnToLogin(message='登录已失效，请重新登录'){clearOidcSession();HA=null;if(workspaceTimer){clearInterval(workspaceTimer);workspaceTimer=0}if(syncTimer){clearInterval(syncTimer);syncTimer=null}$('#auth-gate').classList.remove('hidden');$('#app-loader').classList.add('hidden');loginError(message);history.replaceState({},document.title,redirectUri)}
+    async function oidcFetch(url,options={},retry=true){const session=await validOidcSession();if(!session){returnToLogin();throw new Error('登录已失效')}const headers={...(options.headers||{}),Authorization:'Bearer '+session.access_token},response=await fetch(url,{...options,headers});if(response.status===401&&retry){const refreshed=await validOidcSession(true);if(refreshed)return oidcFetch(url,options,false)}if(response.status===401){returnToLogin();throw new Error('登录已失效')}return response}
     async function authenticate(){
-      const params=new URLSearchParams(location.search),stored=readSession('life-hub-oidc');
+      const params=new URLSearchParams(location.search),stored=await validOidcSession();
       if(params.get('error')){
         sessionStorage.removeItem('life-hub-pkce');
         throw new Error(`验证服务拒绝登录：${params.get('error_description')||params.get('error')}`);
       }
-      if(sessionStorage.getItem('life-hub-dashboard-access')==='true'||stored?.expiresAt>Date.now()){
+      if(stored?.access_token){
         enterDashboard();
         return true
       }
       if(!params.get('code')){
         const local=readSession('life-hub-local');
-        if(sessionStorage.getItem('life-hub-dashboard-access')==='true'||stored?.expiresAt>Date.now()||local?.expiresAt>Date.now()){
+        if(stored?.access_token||local?.expiresAt>Date.now()){
           enterDashboard();
           return true
         }
@@ -75,7 +83,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       if(!response.ok){sessionStorage.removeItem('life-hub-pkce');throw new Error('验证服务未接受登录请求，请检查回调地址、客户端类型和 CORS 设置')}
       const tokens=await response.json();
       if(!tokens?.access_token)throw new Error('验证服务返回的登录结果缺少 access_token');
-      sessionStorage.setItem('life-hub-oidc',JSON.stringify({...tokens,expiresAt:Date.now()+(tokens.expires_in||3600)*1000}));
+      saveOidcSession(tokens);
       sessionStorage.removeItem('life-hub-pkce');
       history.replaceState({},document.title,redirectUri);enterDashboard();return true
     }
@@ -85,9 +93,8 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     };
     $('#auth-continue')?.addEventListener('click',enterDashboard);
     function logout(){
-      sessionStorage.removeItem('life-hub-oidc');
+      clearOidcSession();
       sessionStorage.removeItem('life-hub-pkce');
-      sessionStorage.removeItem('life-hub-dashboard-access');
       sessionStorage.removeItem(localSessionKey);
       sessionStorage.removeItem(localFailsKey);
       sessionStorage.removeItem(localLockKey);
@@ -186,7 +193,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     let updateCheckPromise=null;
     function checkForUpdate(options={}){if(updateCheckPromise)return updateCheckPromise;updateCheckPromise=runUpdateCheck(options).finally(()=>{updateCheckPromise=null});return updateCheckPromise}
     async function runUpdateCheck(options={}){const status=$('#version-status'),button=$('#check-update');if(!status||!button)return null;button.disabled=true;if(!options.silent)status.textContent='正在检查远端版本…';try{const response=await fetch('update.php',{method:'POST',headers:{'X-Life-Hub-Update-Command':'check','Content-Type':'application/json'},body:'{}',cache:'no-store'});let data=null;try{data=await response.json()}catch(error){throw new Error(`版本接口返回 HTTP ${response.status}`)}if(!response.ok||!data.ok)throw new Error(data.error||`HTTP ${response.status}`);const remoteVersion=data.remoteVersion,localVersion=release?.version;if(!remoteVersion||!localVersion)throw new Error('版本格式无法识别');const comparison=compareVersions(remoteVersion,localVersion);if(comparison===null)throw new Error('版本号不是有效的语义化版本');if(comparison>0){setUpdateAvailable(remoteVersion);status.textContent=`发现新版本 v${remoteVersion}`;notice(`发现新版本 v${remoteVersion}，可在设置中升级`)}else if(comparison<0){setUpdateAvailable('');status.textContent=`本地 v${localVersion} 高于远程 v${remoteVersion}`;if(!options.silent)notice('当前部署版本高于远端版本')}else{setUpdateAvailable('');status.textContent='已是最新版本';if(!options.silent)notice('当前已经是最新版本')}return {remoteVersion,comparison}}catch(error){console.warn('版本检查失败：',error);if(!options.silent){status.textContent='检查失败，请稍后重试';notice(`版本检查失败：${error.message}`)}return null}finally{button.disabled=false}}
-    async function requestUpdate(){const session=readSession('life-hub-oidc'),response=await fetch('update.php',{method:'POST',headers:{'X-Life-Hub-Update-Command':'update','Content-Type':'application/json'},body:JSON.stringify({version:pendingRemoteVersion,accessToken:session?.access_token||''}),cache:'no-store'});let data=null;try{data=await response.json()}catch(error){throw new Error(`服务器返回 HTTP ${response.status}`)}return {response,data}}
+    async function requestUpdate(retry=true){const session=await validOidcSession();if(!session){returnToLogin();throw new Error('需要重新登录管理员账号')}const response=await fetch('update.php',{method:'POST',headers:{'X-Life-Hub-Update-Command':'update','Content-Type':'application/json'},body:JSON.stringify({version:pendingRemoteVersion,accessToken:session.access_token}),cache:'no-store'});let data=null;try{data=await response.json()}catch(error){throw new Error(`服务器返回 HTTP ${response.status}`)}if(response.status===401&&retry){const refreshed=await validOidcSession(true);if(refreshed)return requestUpdate(false);returnToLogin()}if(response.status===401){returnToLogin();throw new Error('登录已失效')}return {response,data}}
     async function applyUpdate(){const button=$('#apply-update'),status=$('#version-status');if(!button||!pendingRemoteVersion)return;button.disabled=true;button.textContent='正在升级…';status.textContent='服务器正在拉取远端代码，请勿关闭页面…';try{const result=await requestUpdate();if(!result.response.ok||!result.data.ok)throw new Error(result.data.error||`HTTP ${result.response.status}`);sessionStorage.setItem('life-hub-update-message',`已升级到远端提交 ${result.data.commit||''}`);location.replace(`${location.pathname}?updated=${Date.now()}`)}catch(error){button.disabled=false;button.textContent=`升级到 v${pendingRemoteVersion}`;status.textContent='升级失败';notice(`升级失败：${error.message}`)}}
     function setView(view){if(view===activeView)return;const before=new Map(visibleCards().map(card=>[card,card.getBoundingClientRect()]));activeView=view;document.querySelectorAll('[data-view]').forEach(item=>{const isActive=item.dataset.view===view;item.classList.toggle('active',isActive);if(item.closest('.nav,.mobile-nav'))item.setAttribute('aria-current',isActive?'page':'false')});renderViewIntro(view);applyView();if(view==='settings'){renderWidgetSettings();renderNavSettings();syncProfileSettings();renderThemeSettings();renderCountdownSettings();syncWeatherSettings();syncAiSettings();requestAnimationFrame(animateSettingsView)}else animateViewChange(before);window.scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})}
     document.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>setView(button.dataset.view));
@@ -270,16 +277,17 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     function workspaceSessionText(item){const latest=item.latestSession||{};return latest.id?`最近会话 ${latest.id}${latest.turns?` · ${latest.turns} 轮`:''}`:'暂无会话信息'}
     function renderWorkspaces(data){
       workspaceSnapshot=data;
-      const summary=data?.summary||{},items=Array.isArray(data?.workspaces)?data.workspaces:[],root=$('#workspace-list'),status=$('#workspace-status');
-      status.textContent=`${items.length} 个工作区 · ${new Date(data.generatedAt||Date.now()).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false})} 更新`;
+      const summary=data?.summary||{},items=Array.isArray(data?.workspaces)?data.workspaces:[],source=data?.source||{},root=$('#workspace-list'),status=$('#workspace-status');
+      status.textContent=source.online?`${items.length} 个工作区 · 本地 DSH 在线`:`本地 DSH 离线${source.ageMs===null?'':` · ${relativeActivity(source.ageMs)}`}`;
+      status.classList.toggle('workspace-source-offline',!source.online);
       const counters=$('#workspace-summary')?.querySelectorAll('b');if(counters?.length>=3){counters[0].textContent=summary.working||0;counters[1].textContent=summary.active||0;counters[2].textContent=summary.recent||0}
-      if(!items.length){root.innerHTML='<div class="empty-picker">DSH 中还没有可显示的工作区活动。</div>';return}
+      if(!items.length){root.innerHTML=`<div class="empty-picker">${source.online?'DSH 中还没有可显示的工作区活动。':'尚未收到本地 DSH 推送；请确认本地插件、推送地址和远端密钥配置。'}</div>`;return}
       root.innerHTML=items.map((item,index)=>{const meta=workspaceStateMeta[item.state]||workspaceStateMeta.none;return `<details class="workspace-row state-${escapeHtml(item.state||'none')}" ${index===0&&item.state==='working'?'open':''}><summary><i class="workspace-dot state-${escapeHtml(item.state||'none')}" title="${meta.hint}"></i><span class="workspace-copy"><b>${escapeHtml(item.name||'未命名工作区')}</b><small>${escapeHtml(workspaceSessionText(item))}</small></span><span class="workspace-state">${meta.label}</span><time>${relativeActivity(item.ageMs)}</time></summary><div class="workspace-detail"><span>近 15 分钟 <b>${compactNumber(item.activeEvents)}</b> 个事件</span><span>今日活动 <b>${compactNumber(item.todayEvents)}</b></span><span>今日 Token <b>${compactNumber(item.todayTokens)}</b></span><span>会话 <b>${compactNumber(item.sessions)}</b></span></div></details>`}).join('')
     }
     function workspaceFailure(error){workspaceSnapshot=null;$('#workspace-status').textContent='连接失败';$('#workspace-list').innerHTML=`<div class="workspace-error"><b>无法读取 DSH 工作区</b><small>${escapeHtml(error.message||String(error))}</small></div>`}
     async function syncWorkspaces(options={}){
       if(workspaceSyncing)return;workspaceSyncing=true;const button=$('#workspace-refresh');if(button)button.classList.add('is-spinning');
-      try{const session=readSession('life-hub-oidc'),token=session?.access_token;if(!token)throw new Error('需要 Authentik 管理员登录');const response=await fetch('config.php?action=workspaces',{cache:'no-store',headers:{Authorization:'Bearer '+token}});let data=null;try{data=await response.json()}catch(error){throw new Error(`工作区接口返回 HTTP ${response.status}`)}if(!response.ok||!data.ok)throw new Error(data.error||`工作区接口返回 HTTP ${response.status}`);renderWorkspaces(data);if(options.notice)notice('工作区状态已刷新')}catch(error){workspaceFailure(error);if(options.notice)notice(`工作区刷新失败：${error.message}`)}finally{workspaceSyncing=false;if(button)button.classList.remove('is-spinning')}}
+      try{const response=await oidcFetch('config.php?action=workspaces',{cache:'no-store'});let data=null;try{data=await response.json()}catch(error){throw new Error(`工作区接口返回 HTTP ${response.status}`)}if(!response.ok||!data.ok)throw new Error(data.error||`工作区接口返回 HTTP ${response.status}`);renderWorkspaces(data);if(options.notice)notice('工作区状态已刷新')}catch(error){if(!readOidcSession())return;workspaceFailure(error);if(options.notice)notice(`工作区刷新失败：${error.message}`)}finally{workspaceSyncing=false;if(button)button.classList.remove('is-spinning')}}
     function beginWorkspaceSync(){if(workspaceTimer)clearInterval(workspaceTimer);syncWorkspaces();workspaceTimer=setInterval(syncWorkspaces,10000)}
     $('#workspace-refresh').onclick=()=>syncWorkspaces({notice:true});
 
@@ -315,6 +323,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     };
     loadRuntimeConfig().then(()=>{setLoginReady(true);return authenticate()}).then(async ok=>{
       if(!ok)return;
+      if(!readOidcSession())return;
       beginWorkspaceSync();
       try{await loadPrivateRuntimeConfig()}catch(error){
         $('#ha-status').textContent='管理员权限未解锁';
@@ -324,7 +333,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       }
       sync(HA).then(()=>beginAutoSync(HA)).catch(()=>notice('Home Assistant 连接失败，请检查 .env 与 CORS 设置'))
     }).catch(e=>{setLoginReady(false);loginError(e.message);$('#app-loader').classList.add('hidden')});
-    document.querySelectorAll('.quick-grid button').forEach(b=>b.addEventListener('click',()=>{if(sessionStorage.getItem('life-hub-oidc'))return;b.classList.toggle('on');b.querySelector('small').textContent=b.classList.contains('on')?'已开启':'已关闭'}));
+    document.querySelectorAll('.quick-grid button').forEach(b=>b.addEventListener('click',()=>{if(readOidcSession())return;b.classList.toggle('on');b.querySelector('small').textContent=b.classList.contains('on')?'已开启':'已关闭'}));
     /* ===== 外观主题：日间 / 夜间 / 跟随系统 ===== */
     const themeKey='life-hub-theme',themeMedia=matchMedia('(prefers-color-scheme: dark)');
     function resolvedTheme(){const mode=localStorage.getItem(themeKey)||'auto';return mode==='dark'||(mode==='auto'&&themeMedia.matches)?'dark':'light'}

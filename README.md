@@ -64,31 +64,35 @@
 
 ## 💻 DSH 工作区动态
 
-生活看板可以连接 `dsh-activity-tracker 1.4.5+`，在总览中按工作区实时显示状态：工作中（2 分钟内）、活跃（15 分钟内）、最近活动（60 分钟内）、空闲或无数据。
+本地 `dsh-activity-tracker 1.4.6+` 每 10 秒主动通过 HTTPS 向远端生活看板推送脱敏快照，因此本地 DSH 在 NAT 后也无需开放端口。卡片会显示工作中、活跃、最近活动、空闲，以及本地数据源在线/离线。
 
-卡片每 10 秒自动刷新，支持手动刷新、展开详情、小/中/大尺寸、隐藏和拖拽排序；详情包含脱敏的最近会话 ID、近 15 分钟事件、今日活动、今日 Token 和会话数。
+### 远端服务器配置
 
-### 配置
+在 Life Dashboard 服务器 `.env` 添加：
 
-1. 在 DSH 主机创建 `~/.dsh/dsh-activity-tracker-dashboard.json`：
+```dotenv
+LIFE_HUB_DSH_PUSH_SECRET="replace-with-a-random-32-byte-or-longer-secret"
+LIFE_HUB_DSH_OFFLINE_AFTER_SECONDS="45"
+LIFE_HUB_OIDC_REMEMBER_DAYS="30"
+```
+
+### 本地 DSH 配置
+
+创建 `~/.dsh/dsh-activity-tracker-dashboard.json`：
 
 ```json
 {
-  "token": "replace-with-a-random-32-byte-or-longer-secret"
+  "token": "与远端 LIFE_HUB_DSH_PUSH_SECRET 完全相同",
+  "pushUrl": "https://life.mcylyr.cn/config.php?action=workspace-push",
+  "intervalSeconds": 10
 }
 ```
 
-2. 在生活看板服务器 `.env` 使用同一令牌，并填写服务器可访问的 DSH 地址：
+重启本地 DSH。推送采用 HMAC-SHA256、120 秒时间窗口和重放防护，远端缓存写入系统临时目录；浏览器仍需 Authentik 管理员身份才能读取。
 
-```dotenv
-LIFE_HUB_DSH_URL="http://dsh-host:2712"
-LIFE_HUB_DSH_TOKEN="replace-with-a-random-32-byte-or-longer-secret"
-LIFE_HUB_DSH_TIMEOUT_SECONDS="5"
-```
+### 登录续期
 
-3. 重启 DSH 和生活看板服务。如果二者不在同一主机，不要将 DSH 地址写为 `127.0.0.1`。
-
-浏览器不会收到 DSH 地址或共享令牌。请求先经过 Authentik 管理员校验，再由 PHP 服务端代理；接口不返回完整工作目录、会话标题、用户输入或命令内容。
+OIDC 登录默认最多记住 30 天，Access Token 到期前会使用 Refresh Token 自动续期；续期失败、会话超过期限或私密接口返回 401 时会清理会话并返回登录页。Authentik Provider 必须允许公共客户端使用 Refresh Token，并允许 `offline_access` scope；否则仍会在 Access Token 到期后要求重新登录。
 
 # 📦 项目特点
 

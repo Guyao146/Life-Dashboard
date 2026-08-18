@@ -6,6 +6,19 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [0.7.1] - 2026-08-18
+
+### 新增
+
+- 本地 DSH 改为通过 HTTPS 主动推送工作区快照，支持 NAT 后的本地开发机连接远端生活看板。
+- 工作区卡片显示本地数据源在线/离线状态。
+- Authentik OIDC 登录支持持久化、Refresh Token 自动续期和可配置的最长记住期限。
+
+### 安全
+
+- 推送使用时间戳 HMAC-SHA256、重放防护、字段白名单和系统临时目录原子缓存。
+- 登录失效或续期失败时立即清理本地会话并返回登录页。
+
 ## [0.7.0] - 2026-08-18
 
 ### 新增
@@ -132,3 +145,4 @@
 [0.4.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.3.0
 [0.7.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.7.0
+[0.7.1]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.7.1

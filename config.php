@@ -195,58 +195,105 @@ function authorizationDetails(array $claims, array $values): array
 }
 
 
-function fetchDshWorkspaces(array $values): array
+function workspaceCachePath(): string
 {
-    $baseUrl = requiredEnv($values, 'LIFE_HUB_DSH_URL');
-    $token = requiredEnv($values, 'LIFE_HUB_DSH_TOKEN');
-    if (strlen($token) < 24) {
-        configRespond(503, ['ok' => false, 'error' => 'LIFE_HUB_DSH_TOKEN 至少需要 24 个字符']);
-    }
-    if (filter_var($baseUrl, FILTER_VALIDATE_URL) === false || !in_array(parse_url($baseUrl, PHP_URL_SCHEME), ['http', 'https'], true)) {
-        configRespond(503, ['ok' => false, 'error' => 'LIFE_HUB_DSH_URL 必须是有效的 http/https 地址']);
-    }
-    if (parse_url($baseUrl, PHP_URL_USER) !== null || parse_url($baseUrl, PHP_URL_PASS) !== null) {
-        configRespond(503, ['ok' => false, 'error' => 'LIFE_HUB_DSH_URL 不允许包含账号或密码']);
-    }
-    $url = rtrim($baseUrl, '/') . '/dsh-activity/api/workspaces';
-    $timeout = max(2, min(15, (int) envValue($values, 'LIFE_HUB_DSH_TIMEOUT_SECONDS', '5')));
-    $body = '';
-    $status = 0;
-    if (function_exists('curl_init')) {
-        $curl = curl_init($url);
-        curl_setopt_array($curl, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CONNECTTIMEOUT => $timeout,
-            CURLOPT_TIMEOUT => $timeout,
-            CURLOPT_HTTPHEADER => ['Accept: application/json', 'X-DSH-Dashboard-Token: ' . $token],
-        ]);
-        $result = curl_exec($curl);
-        $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
-        $error = curl_error($curl);
-        curl_close($curl);
-        if ($result === false) configRespond(502, ['ok' => false, 'error' => '无法连接 DSH：' . $error]);
-        $body = (string) $result;
-    } else {
-        $context = stream_context_create(['http' => [
-            'method' => 'GET',
-            'timeout' => $timeout,
-            'ignore_errors' => true,
-            'header' => "Accept: application/json\r\nX-DSH-Dashboard-Token: {$token}\r\n",
-        ]]);
-        $result = @file_get_contents($url, false, $context);
-        $body = is_string($result) ? $result : '';
-        foreach ($http_response_header ?? [] as $header) {
-            if (preg_match('/^HTTP\/\S+\s+(\d{3})/', $header, $match) === 1) { $status = (int) $match[1]; break; }
-        }
-    }
-    $payload = json_decode($body, true);
-    if ($status !== 200 || !is_array($payload) || ($payload['ok'] ?? false) !== true || !is_array($payload['workspaces'] ?? null)) {
-        $message = is_array($payload) ? (string) ($payload['error'] ?? "HTTP {$status}") : "HTTP {$status}";
-        configRespond(502, ['ok' => false, 'error' => 'DSH 工作区接口失败：' . $message]);
-    }
-    return $payload;
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR
+        . 'life-dashboard-workspaces-' . substr(hash('sha256', __DIR__), 0, 16) . '.json';
 }
 
+function validateWorkspacePayload(array $payload): array
+{
+    if (($payload['ok'] ?? false) !== true || !is_array($payload['workspaces'] ?? null) || !is_array($payload['summary'] ?? null)) {
+        configRespond(400, ['ok' => false, 'error' => '工作区推送数据结构无效']);
+    }
+    if (count($payload['workspaces']) > 500) configRespond(400, ['ok' => false, 'error' => '工作区数量超出限制']);
+    $workspaces = [];
+    foreach ($payload['workspaces'] as $item) {
+        if (!is_array($item) || preg_match('/^[a-f0-9]{16}$/', (string) ($item['key'] ?? '')) !== 1) {
+            configRespond(400, ['ok' => false, 'error' => '工作区标识无效']);
+        }
+        $session = is_array($item['latestSession'] ?? null) ? $item['latestSession'] : [];
+        $workspaces[] = [
+            'key' => (string) $item['key'],
+            'name' => function_exists('mb_substr') ? mb_substr(trim((string) ($item['name'] ?? '未命名工作区')), 0, 100) : substr(trim((string) ($item['name'] ?? 'unnamed')), 0, 100),
+            'lastAt' => max(0, (int) ($item['lastAt'] ?? 0)),
+            'sessions' => max(0, (int) ($item['sessions'] ?? 0)),
+            'activeEvents' => max(0, (int) ($item['activeEvents'] ?? 0)),
+            'todayEvents' => max(0, (int) ($item['todayEvents'] ?? 0)),
+            'todayTokens' => max(0, (int) ($item['todayTokens'] ?? 0)),
+            'state' => in_array($item['state'] ?? '', ['working', 'active', 'recent', 'idle', 'none'], true) ? $item['state'] : 'none',
+            'ageMs' => isset($item['ageMs']) ? max(0, (int) $item['ageMs']) : null,
+            'latestSession' => $session === [] ? null : [
+                'id' => preg_match('/^[a-z0-9-]{1,16}$/i', (string) ($session['id'] ?? '')) === 1 ? (string) $session['id'] : '',
+                'turns' => max(0, (int) ($session['turns'] ?? 0)),
+                'lastAt' => max(0, (int) ($session['lastAt'] ?? 0)),
+            ],
+        ];
+    }
+    $summary = [];
+    foreach (['total', 'working', 'active', 'recent', 'idle', 'none'] as $key) $summary[$key] = max(0, (int) ($payload['summary'][$key] ?? 0));
+    return [
+        'ok' => true,
+        'generatedAt' => max(0, (int) ($payload['generatedAt'] ?? 0)),
+        'tz' => function_exists('mb_substr') ? mb_substr((string) ($payload['tz'] ?? ''), 0, 100) : substr((string) ($payload['tz'] ?? ''), 0, 100),
+        'thresholdsMs' => is_array($payload['thresholdsMs'] ?? null) ? $payload['thresholdsMs'] : [],
+        'summary' => $summary,
+        'workspaces' => $workspaces,
+    ];
+}
+
+function receiveWorkspacePush(array $values): never
+{
+    $secret = requiredEnv($values, 'LIFE_HUB_DSH_PUSH_SECRET');
+    if (strlen($secret) < 32) configRespond(503, ['ok' => false, 'error' => 'LIFE_HUB_DSH_PUSH_SECRET 至少需要 32 个字符']);
+    $timestamp = (string) ($_SERVER['HTTP_X_DSH_PUSH_TIMESTAMP'] ?? '');
+    $signature = strtolower((string) ($_SERVER['HTTP_X_DSH_PUSH_SIGNATURE'] ?? ''));
+    if (preg_match('/^\d{10}$/', $timestamp) !== 1 || preg_match('/^[a-f0-9]{64}$/', $signature) !== 1) {
+        configRespond(401, ['ok' => false, 'error' => '推送签名缺失或无效']);
+    }
+    $now = time();
+    if (abs($now - (int) $timestamp) > 120) configRespond(401, ['ok' => false, 'error' => '推送时间戳已过期']);
+    $body = (string) file_get_contents('php://input');
+    if ($body === '' || strlen($body) > 512 * 1024) configRespond(413, ['ok' => false, 'error' => '推送请求体无效']);
+    $expected = hash_hmac('sha256', $timestamp . '.' . $body, $secret);
+    if (!hash_equals($expected, $signature)) configRespond(401, ['ok' => false, 'error' => '推送签名校验失败']);
+    $payload = json_decode($body, true);
+    if (!is_array($payload)) configRespond(400, ['ok' => false, 'error' => '推送请求体必须是 JSON']);
+    $payload = validateWorkspacePayload($payload);
+    $path = workspaceCachePath();
+    $previous = json_decode((string) @file_get_contents($path), true);
+    if (is_array($previous) && (int) ($previous['pushTimestamp'] ?? 0) >= (int) $timestamp) {
+        configRespond(409, ['ok' => false, 'error' => '重复或过期的推送请求']);
+    }
+    $record = ['receivedAt' => (int) round(microtime(true) * 1000), 'pushTimestamp' => (int) $timestamp, 'payload' => $payload];
+    $temporary = $path . '.' . bin2hex(random_bytes(6)) . '.tmp';
+    if (@file_put_contents($temporary, json_encode($record, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX) === false || !@rename($temporary, $path)) {
+        @unlink($temporary);
+        configRespond(500, ['ok' => false, 'error' => '服务器无法保存工作区快照']);
+    }
+    @chmod($path, 0600);
+    configRespond(202, ['ok' => true, 'receivedAt' => $record['receivedAt']]);
+}
+
+function cachedDshWorkspaces(array $values): array
+{
+    $record = json_decode((string) @file_get_contents(workspaceCachePath()), true);
+    if (!is_array($record) || !is_array($record['payload'] ?? null)) {
+        return ['ok' => true, 'generatedAt' => 0, 'summary' => ['total' => 0, 'working' => 0, 'active' => 0, 'recent' => 0, 'idle' => 0, 'none' => 0], 'workspaces' => [], 'source' => ['online' => false, 'receivedAt' => 0, 'ageMs' => null]];
+    }
+    $receivedAt = (int) ($record['receivedAt'] ?? 0);
+    $ageMs = max(0, (int) round(microtime(true) * 1000) - $receivedAt);
+    $offlineAfter = max(30, min(3600, (int) envValue($values, 'LIFE_HUB_DSH_OFFLINE_AFTER_SECONDS', '45'))) * 1000;
+    $payload = validateWorkspacePayload($record['payload']);
+    foreach ($payload['workspaces'] as &$item) if ($item['ageMs'] !== null) $item['ageMs'] += $ageMs;
+    unset($item);
+    return $payload + ['source' => ['online' => $ageMs <= $offlineAfter, 'receivedAt' => $receivedAt, 'ageMs' => $ageMs]];
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && strtolower(trim((string) ($_GET['action'] ?? ''))) === 'workspace-push') {
+    $values = loadEnvFile();
+    receiveWorkspacePush($values);
+}
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     configRespond(405, ['ok' => false, 'error' => '配置接口只接受 GET 请求']);
 }
@@ -263,6 +310,7 @@ if ($action === 'public') {
             'clientId' => requiredEnv($values, 'LIFE_HUB_OIDC_CLIENT_ID'),
             'authorize' => requiredEnv($values, 'LIFE_HUB_OIDC_AUTHORIZE_URL'),
             'token' => requiredEnv($values, 'LIFE_HUB_OIDC_TOKEN_URL'),
+            'rememberDays' => max(1, min(90, (int) envValue($values, 'LIFE_HUB_OIDC_REMEMBER_DAYS', '30'))),
         ],
     ];
     $localUsername = envValue($values, 'LIFE_HUB_LOCAL_AUTH_USERNAME');
@@ -302,7 +350,7 @@ if (!$authorization['administrator']) {
 }
 
 if ($action === 'workspaces') {
-    configRespond(200, fetchDshWorkspaces($values));
+    configRespond(200, cachedDshWorkspaces($values));
 }
 
 configRespond(200, [
