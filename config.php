@@ -201,6 +201,28 @@ function workspaceCachePath(): string
         . 'life-dashboard-workspaces-' . substr(hash('sha256', __DIR__), 0, 16) . '.json';
 }
 
+function workspaceCommandPath(): string
+{
+    return workspaceCachePath() . '.commands';
+}
+
+function workspaceCommands(): array
+{
+    $commands = json_decode((string) @file_get_contents(workspaceCommandPath()), true);
+    $now = time();
+    return array_values(array_filter(is_array($commands) ? $commands : [], static fn(array $item): bool => (int) ($item['expiresAt'] ?? 0) > $now));
+}
+
+function saveWorkspaceCommands(array $commands): void
+{
+    $path = workspaceCommandPath();
+    $temporary = $path . '.' . bin2hex(random_bytes(6)) . '.tmp';
+    if (@file_put_contents($temporary, json_encode(array_slice($commands, -200), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX) === false || !@rename($temporary, $path)) {
+        @unlink($temporary); configRespond(500, ['ok' => false, 'error' => '服务器无法保存消息队列']);
+    }
+    @chmod($path, 0600);
+}
+
 function validateWorkspacePayload(array $payload): array
 {
     if (($payload['ok'] ?? false) !== true || !is_array($payload['workspaces'] ?? null) || !is_array($payload['summary'] ?? null)) {
@@ -213,6 +235,33 @@ function validateWorkspacePayload(array $payload): array
             configRespond(400, ['ok' => false, 'error' => '工作区标识无效']);
         }
         $session = is_array($item['latestSession'] ?? null) ? $item['latestSession'] : [];
+        $detailAuthorized = ($item['detailAuthorized'] ?? false) === true;
+        $detailSessions = [];
+        if ($detailAuthorized && is_array($item['detailSessions'] ?? null)) {
+            foreach (array_slice($item['detailSessions'], 0, 20) as $detailSession) {
+                if (!is_array($detailSession) || preg_match('/^[a-f0-9-]{8,64}$/i', (string) ($detailSession['id'] ?? '')) !== 1) continue;
+                $records = [];
+                if (is_array($detailSession['records'] ?? null)) foreach (array_slice($detailSession['records'], -120) as $record) {
+                    if (!is_array($record) || !in_array($record['type'] ?? '', ['user', 'assistant', 'tool', 'tool-result', 'approval', 'approval-result', 'turn-end'], true)) continue;
+                    $records[] = [
+                        'seq' => max(0, (int) ($record['seq'] ?? 0)),
+                        't' => max(0, (int) ($record['t'] ?? 0)),
+                        'type' => (string) $record['type'],
+                        'name' => function_exists('mb_substr') ? mb_substr((string) ($record['name'] ?? ''), 0, 120) : substr((string) ($record['name'] ?? ''), 0, 120),
+                        'text' => function_exists('mb_substr') ? mb_substr((string) ($record['text'] ?? ''), 0, 24000) : substr((string) ($record['text'] ?? ''), 0, 24000),
+                        'status' => function_exists('mb_substr') ? mb_substr((string) ($record['status'] ?? ''), 0, 40) : substr((string) ($record['status'] ?? ''), 0, 40),
+                        'model' => function_exists('mb_substr') ? mb_substr((string) ($record['model'] ?? ''), 0, 120) : substr((string) ($record['model'] ?? ''), 0, 120),
+                    ];
+                }
+                $detailSessions[] = [
+                    'id' => (string) $detailSession['id'],
+                    'title' => function_exists('mb_substr') ? mb_substr((string) ($detailSession['title'] ?? ''), 0, 240) : substr((string) ($detailSession['title'] ?? ''), 0, 240),
+                    'createdAt' => max(0, (int) ($detailSession['createdAt'] ?? 0)),
+                    'turns' => max(0, (int) ($detailSession['turns'] ?? 0)),
+                    'records' => $records,
+                ];
+            }
+        }
         $workspaces[] = [
             'key' => (string) $item['key'],
             'name' => function_exists('mb_substr') ? mb_substr(trim((string) ($item['name'] ?? '未命名工作区')), 0, 100) : substr(trim((string) ($item['name'] ?? 'unnamed')), 0, 100),
@@ -228,10 +277,14 @@ function validateWorkspacePayload(array $payload): array
                 'turns' => max(0, (int) ($session['turns'] ?? 0)),
                 'lastAt' => max(0, (int) ($session['lastAt'] ?? 0)),
             ],
+            'detailAuthorized' => $detailAuthorized,
+            'detailSessions' => $detailSessions,
         ];
     }
     $summary = [];
     foreach (['total', 'working', 'active', 'recent', 'idle', 'none'] as $key) $summary[$key] = max(0, (int) ($payload['summary'][$key] ?? 0));
+    $commandAcks = [];
+    if (is_array($payload['commandAcks'] ?? null)) foreach (array_slice($payload['commandAcks'], -200) as $id) if (preg_match('/^[a-f0-9-]{36}$/i', (string) $id) === 1) $commandAcks[] = (string) $id;
     return [
         'ok' => true,
         'generatedAt' => max(0, (int) ($payload['generatedAt'] ?? 0)),
@@ -239,6 +292,7 @@ function validateWorkspacePayload(array $payload): array
         'thresholdsMs' => is_array($payload['thresholdsMs'] ?? null) ? $payload['thresholdsMs'] : [],
         'summary' => $summary,
         'workspaces' => $workspaces,
+        'commandAcks' => array_values(array_unique($commandAcks)),
     ];
 }
 
@@ -254,7 +308,7 @@ function receiveWorkspacePush(array $values): never
     $now = time();
     if (abs($now - (int) $timestamp) > 120) configRespond(401, ['ok' => false, 'error' => '推送时间戳已过期']);
     $body = (string) file_get_contents('php://input');
-    if ($body === '' || strlen($body) > 512 * 1024) configRespond(413, ['ok' => false, 'error' => '推送请求体无效']);
+    if ($body === '' || strlen($body) > 1536 * 1024) configRespond(413, ['ok' => false, 'error' => '推送请求体无效']);
     $expected = hash_hmac('sha256', $timestamp . '.' . $body, $secret);
     if (!hash_equals($expected, $signature)) configRespond(401, ['ok' => false, 'error' => '推送签名校验失败']);
     $payload = json_decode($body, true);
@@ -265,6 +319,10 @@ function receiveWorkspacePush(array $values): never
     if (is_array($previous) && (int) ($previous['pushTimestamp'] ?? 0) >= (int) $timestamp) {
         configRespond(409, ['ok' => false, 'error' => '重复或过期的推送请求']);
     }
+    if ($payload['commandAcks'] !== []) {
+        $acked = array_flip($payload['commandAcks']);
+        saveWorkspaceCommands(array_values(array_filter(workspaceCommands(), static fn(array $command): bool => !isset($acked[(string) ($command['id'] ?? '')]))));
+    }
     $record = ['receivedAt' => (int) round(microtime(true) * 1000), 'pushTimestamp' => (int) $timestamp, 'payload' => $payload];
     $temporary = $path . '.' . bin2hex(random_bytes(6)) . '.tmp';
     if (@file_put_contents($temporary, json_encode($record, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX) === false || !@rename($temporary, $path)) {
@@ -272,7 +330,7 @@ function receiveWorkspacePush(array $values): never
         configRespond(500, ['ok' => false, 'error' => '服务器无法保存工作区快照']);
     }
     @chmod($path, 0600);
-    configRespond(202, ['ok' => true, 'receivedAt' => $record['receivedAt']]);
+    configRespond(202, ['ok' => true, 'receivedAt' => $record['receivedAt'], 'commands' => workspaceCommands()]);
 }
 
 function cachedDshWorkspaces(array $values): array
@@ -294,7 +352,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && strtolower(trim((string) ($_GET['ac
     $values = loadEnvFile();
     receiveWorkspacePush($values);
 }
-if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+if ($_SERVER['REQUEST_METHOD'] !== 'GET' && !(strtolower(trim((string) ($_GET['action'] ?? ''))) === 'workspace-command' && $_SERVER['REQUEST_METHOD'] === 'POST')) {
     configRespond(405, ['ok' => false, 'error' => '配置接口只接受 GET 请求']);
 }
 if (!requestIsSameOrigin()) {
@@ -329,7 +387,7 @@ if ($action === 'public') {
     configRespond(200, $payload);
 }
 
-if (!in_array($action, ['private', 'identity', 'workspaces'], true)) {
+if (!in_array($action, ['private', 'identity', 'workspaces', 'workspace-command'], true)) {
     configRespond(400, ['ok' => false, 'error' => 'action 必须为 public、identity、private 或 workspaces']);
 }
 
@@ -347,6 +405,26 @@ if (!$authorization['administrator']) {
         ? '服务器未配置 LIFE_HUB_ADMIN_GROUPS'
         : '当前 Authentik 账号不在允许的管理员组中';
     configRespond(403, ['ok' => false, 'error' => $error, 'identity' => $identity, 'authorization' => $authorization]);
+}
+
+if ($action === 'workspace-command') {
+    $body = (string) file_get_contents('php://input');
+    if ($body === '' || strlen($body) > 16 * 1024) configRespond(413, ['ok' => false, 'error' => '消息请求体无效']);
+    $input = json_decode($body, true);
+    $workspaceKey = (string) ($input['workspaceKey'] ?? '');
+    $sessionId = (string) ($input['sessionId'] ?? '');
+    $message = trim((string) ($input['message'] ?? ''));
+    if (preg_match('/^[a-f0-9]{16}$/', $workspaceKey) !== 1 || preg_match('/^[a-f0-9-]{8,64}$/i', $sessionId) !== 1 || $message === '' || strlen($message) > 8000) configRespond(400, ['ok' => false, 'error' => '工作区、会话或消息无效']);
+    $snapshot = cachedDshWorkspaces($values);
+    $workspace = null;
+    foreach ($snapshot['workspaces'] as $candidate) if ($candidate['key'] === $workspaceKey) { $workspace = $candidate; break; }
+    if (!is_array($workspace) || !$workspace['detailAuthorized']) configRespond(403, ['ok' => false, 'error' => '本机未授权此工作区']);
+    $found = false; foreach ($workspace['detailSessions'] as $session) if ($session['id'] === $sessionId) { $found = true; break; }
+    if (!$found) configRespond(404, ['ok' => false, 'error' => '会话不存在']);
+    $commands = workspaceCommands();
+    $command = ['id' => bin2hex(random_bytes(4)) . '-' . bin2hex(random_bytes(2)) . '-4' . substr(bin2hex(random_bytes(2)), 1) . '-a' . substr(bin2hex(random_bytes(2)), 1) . '-' . bin2hex(random_bytes(6)), 'workspaceKey' => $workspaceKey, 'sessionId' => $sessionId, 'message' => $message, 'createdAt' => time(), 'expiresAt' => time() + 120];
+    $commands[] = $command; saveWorkspaceCommands($commands);
+    configRespond(202, ['ok' => true, 'commandId' => $command['id'], 'expiresAt' => $command['expiresAt']]);
 }
 
 if ($action === 'workspaces') {
