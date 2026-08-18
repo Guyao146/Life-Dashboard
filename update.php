@@ -4,17 +4,10 @@ declare(strict_types=1);
 /*
  * Life Hub server-side updater.
  *
- * Required environment variable:
- *   LIFE_HUB_UPDATE_MODE=token   (recommended)
- *   LIFE_HUB_UPDATE_TOKEN=change-this-to-a-long-random-secret
- *
- * For the requested one-click mode, set LIFE_HUB_UPDATE_MODE=auto. This
- * removes the per-click secret, so anyone who can reach this endpoint can
- * request the fixed fast-forward update. Keep the endpoint private or put
- * it behind your reverse proxy/authentication when using auto mode.
- *
- * The browser never receives this value. The operator enters it once after
- * an update is detected and it is kept only in sessionStorage for that tab.
+ * Update authorization reuses the Authentik administrator session. The
+ * browser sends its access token in the same-origin POST body; this endpoint
+ * verifies it against the configured UserInfo endpoint and administrator
+ * allow lists before deploying the fixed remote branch.
  */
 
 header('Content-Type: application/json; charset=utf-8');
@@ -50,27 +43,74 @@ function respond(int $status, array $payload): never
     exit;
 }
 
-function configuredToken(): string
+function requestAuthToken(): string
 {
-    return updateEnv('LIFE_HUB_UPDATE_TOKEN');
-}
-
-function requestToken(): string
-{
-    $header = $_SERVER['HTTP_X_LIFE_HUB_UPDATE_TOKEN'] ?? '';
-    if (is_string($header) && $header !== '') {
-        return trim($header);
+    static $requestBody = null;
+    if ($requestBody === null) {
+        $decoded = json_decode((string) file_get_contents('php://input'), true);
+        $requestBody = is_array($decoded) ? $decoded : [];
+    }
+    $token = $requestBody['accessToken'] ?? '';
+    if (is_string($token) && trim($token) !== '') {
+        return trim($token);
     }
 
-    // PHP-FPM/Apache may expose the header through this name instead.
-    $fallback = $_SERVER['HTTP_X_UPDATE_TOKEN'] ?? '';
-    return is_string($fallback) ? trim($fallback) : '';
+    $header = (string) ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+    if ($header === '' && function_exists('getallheaders')) {
+        $headers = getallheaders();
+        $header = (string) ($headers['Authorization'] ?? $headers['authorization'] ?? '');
+    }
+    return preg_match('/^Bearer\s+(.+)$/i', trim($header), $match) === 1 ? trim($match[1]) : '';
 }
 
-function updateMode(): string
+function fetchUserInfo(string $url, string $token): array
 {
-    $mode = strtolower(updateEnv('LIFE_HUB_UPDATE_MODE', 'token'));
-    return in_array($mode, ['auto', 'token'], true) ? $mode : 'token';
+    if (filter_var($url, FILTER_VALIDATE_URL) === false || parse_url($url, PHP_URL_SCHEME) !== 'https') {
+        throw new RuntimeException('LIFE_HUB_OIDC_USERINFO_URL 必须是 HTTPS 地址');
+    }
+    if ($token === '' || strlen($token) > 8192) {
+        throw new RuntimeException('缺少有效的 Authentik 管理员登录令牌');
+    }
+
+    $status = 0;
+    $body = false;
+    if (function_exists('curl_init')) {
+        $curl = curl_init($url);
+        curl_setopt_array($curl, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => false, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 10, CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $token, 'Accept: application/json']]);
+        $body = curl_exec($curl);
+        $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        curl_close($curl);
+    } else {
+        $context = stream_context_create(['http' => ['method' => 'GET', 'timeout' => 10, 'ignore_errors' => true, 'header' => "Authorization: Bearer {$token}\r\nAccept: application/json\r\n"]]);
+        $body = @file_get_contents($url, false, $context);
+        $statusLine = $http_response_header[0] ?? '';
+        if (preg_match('/\s(\d{3})\s/', $statusLine, $match) === 1) $status = (int) $match[1];
+    }
+    if ($status === 401 || $status === 403) throw new RuntimeException('Authentik 管理员登录令牌无效或已过期');
+    if ($status < 200 || $status >= 300 || !is_string($body)) throw new RuntimeException("Authentik UserInfo 校验失败（HTTP {$status}）");
+    $claims = json_decode($body, true);
+    if (!is_array($claims) || empty($claims['sub'])) throw new RuntimeException('Authentik UserInfo 响应无效');
+    return $claims;
+}
+
+function allowList(string $key): array
+{
+    $raw = updateEnv($key);
+    return array_values(array_filter(array_map(static fn(string $item): string => strtolower(trim($item)), preg_split('/[,;\r\n]+/', $raw) ?: [])));
+}
+
+function isAdministrator(array $claims): bool
+{
+    $allowedGroups = allowList('LIFE_HUB_ADMIN_GROUPS');
+    $allowedUsers = allowList('LIFE_HUB_ADMIN_USERS');
+    $allowedEmails = allowList('LIFE_HUB_ADMIN_EMAILS');
+    if ($allowedGroups === [] && $allowedUsers === [] && $allowedEmails === []) return false;
+    $claimGroups = $claims['groups'] ?? [];
+    if (is_string($claimGroups)) $claimGroups = preg_split('/[,;\r\n]+/', $claimGroups) ?: [];
+    $groups = array_map('strtolower', array_map('strval', is_array($claimGroups) ? $claimGroups : []));
+    $username = strtolower(trim((string) ($claims['preferred_username'] ?? '')));
+    $email = strtolower(trim((string) ($claims['email'] ?? '')));
+    return array_intersect($allowedGroups, $groups) !== [] || ($username !== '' && in_array($username, $allowedUsers, true)) || ($email !== '' && in_array($email, $allowedEmails, true));
 }
 
 function requestCommand(): string
@@ -300,15 +340,14 @@ if (!in_array($command, ['check', 'update'], true)) {
     respond(400, ['ok' => false, 'error' => '指令必须为 check 或 update']);
 }
 
-$mode = updateMode();
-if ($command === 'update' && $mode === 'token') {
-    $configured = configuredToken();
-    if ($configured === '') {
-        respond(503, ['ok' => false, 'requiresToken' => true, 'error' => '服务器未配置 LIFE_HUB_UPDATE_TOKEN']);
+if ($command === 'update') {
+    try {
+        $claims = fetchUserInfo(updateEnv('LIFE_HUB_OIDC_USERINFO_URL'), requestAuthToken());
+    } catch (Throwable $error) {
+        respond(401, ['ok' => false, 'error' => $error->getMessage()]);
     }
-    $provided = requestToken();
-    if ($provided === '' || !hash_equals($configured, $provided)) {
-        respond(401, ['ok' => false, 'requiresToken' => true, 'error' => '升级密钥无效']);
+    if (!isAdministrator($claims)) {
+        respond(403, ['ok' => false, 'error' => '当前 Authentik 账号不是看板管理员']);
     }
 }
 

@@ -255,11 +255,9 @@ JSON.stringify({ salt: e(s), hash: e(new Uint8Array(b)), iterations: 310000 });
 站点目录无需是 Git 工作区。`update.php` 会在 PHP 系统临时目录维护一个远端浅克隆，并把其中的产品文件部署到站点目录：
 
 1. 将根目录的 `update.php` 暴露在与看板相同的域名下；
-2. 推荐使用密钥模式，在服务器环境变量中设置：
+2. 升级权限复用 Authentik 管理员登录，不需要额外的 `LIFE_HUB_UPDATE_TOKEN`：
 
    ```bash
-   LIFE_HUB_UPDATE_TOKEN="请替换为至少 32 位随机字符串"
-   LIFE_HUB_UPDATE_MODE="token"
    LIFE_HUB_UPDATE_BRANCH="main"
    LIFE_HUB_UPDATE_REPOSITORY="https://github.com/Guyao146/Life-Dashboard.git"
    ```
@@ -268,16 +266,7 @@ JSON.stringify({ salt: e(s), hash: e(new Uint8Array(b)), iterations: 310000 });
 4. 确保 PHP 用户可写 PHP 系统临时目录；执行升级时还需能写站点目录，并允许 PHP 使用 `proc_open` 执行 `git`；
 5. 在设置 → 版本与更新中点击“检查更新”。检测到远端版本更高时，点击“升级到 vX.Y.Z”，PHP 会刷新临时浅克隆并部署文件。服务器本地的 `.env` 和 `.git` 不会被覆盖；遗留 `config.js` 会被删除。
 
-如果你明确希望“前端点升级就直接拉取”，可以改成无密钥模式：
-
-```bash
-LIFE_HUB_UPDATE_MODE="auto"
-LIFE_HUB_UPDATE_BRANCH="main"
-```
-
-`auto` 模式不需要输入密钥，但任何能访问 `update.php` 的人都可以触发一次固定分支的升级。因此建议把 `update.php` 放到反向代理的访问控制后面；否则请使用推荐的 `token` 模式。
-
-`update.php` 只接受同源 POST、校验升级指令，并且只允许拉取 `LIFE_HUB_UPDATE_BRANCH` 指定的分支（默认 `main`），同时使用文件锁防止并发升级。升级密钥只保存在 `.env` 或 PHP-FPM 环境变量中。
+`update.php` 只接受同源 POST，并要求当前浏览器携带有效的 Authentik 管理员会话；普通 Authentik 用户、本地账号、未登录用户和跨站请求都不能触发升级。它只允许拉取 `LIFE_HUB_UPDATE_BRANCH` 指定的分支（默认 `main`），同时使用文件锁防止并发升级。
 
 ### 从旧 `config.js` 迁移
 

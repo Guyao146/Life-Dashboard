@@ -6,6 +6,13 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [0.6.2] - 2026-08-18
+
+### 修复
+
+- 一键升级改为自动复用当前 Authentik 管理员会话，不再要求输入或配置 `LIFE_HUB_UPDATE_TOKEN`。
+- 升级接口在部署前通过 Authentik UserInfo 与管理员白名单校验身份，未登录用户、普通用户和本地账号均无法触发升级。
+
 ## [0.6.1] - 2026-08-18
 
 ### 修复
@@ -92,6 +99,7 @@
 - 恢复 Authentik 公共客户端配置的默认加载，私有 `config.js` 缺失时仍可登录。
 - 登录配置加载前禁用登录按钮，并在配置异常时显示明确错误。
 
+[0.6.2]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.6.2
 [0.6.1]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.6.1
 [0.6.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.6.0
 [0.5.10]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.10
