@@ -1,0 +1,20 @@
+# Add these rules inside the life.mcylyr.cn `server { ... }` block.
+
+# .env and every other dotfile must never be served by Nginx.
+location ~ /\.(?!well-known(?:/|$)) {
+    return 404;
+}
+
+# Block legacy browser-readable configuration files during migration.
+location = /config.js {
+    return 404;
+}
+location = /config.example.js {
+    return 404;
+}
+
+# Keep your existing PHP 8.2 location/FastCGI configuration for config.php
+# and update.php. Make sure the Authorization header reaches PHP-FPM:
+#   fastcgi_param HTTP_AUTHORIZATION $http_authorization;
+# Reload Nginx after validating the final configuration:
+#   nginx -t && systemctl reload nginx

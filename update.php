@@ -20,6 +20,29 @@ declare(strict_types=1);
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, no-cache, must-revalidate');
 
+function updateEnv(string $key, string $default = ''): string
+{
+    static $fileValues = null;
+    $runtime = getenv($key);
+    if (is_string($runtime) && $runtime !== '') {
+        return trim($runtime);
+    }
+    if ($fileValues === null) {
+        $fileValues = [];
+        $configuredPath = getenv('LIFE_HUB_ENV_FILE');
+        $path = is_string($configuredPath) && trim($configuredPath) !== '' ? trim($configuredPath) : __DIR__ . DIRECTORY_SEPARATOR . '.env';
+        foreach (@file($path, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) continue;
+            [$name,$value]=array_map('trim',explode('=',$line,2));
+            if (preg_match('/^[A-Z][A-Z0-9_]*$/',$name)!==1) continue;
+            if(strlen($value)>=2&&(($value[0]==='"'&&str_ends_with($value,'"'))||($value[0]==="'"&&str_ends_with($value,"'"))))$value=substr($value,1,-1);
+            $fileValues[$name]=$value;
+        }
+    }
+    return trim((string)($fileValues[$key]??$default));
+}
+
 function respond(int $status, array $payload): never
 {
     http_response_code($status);
@@ -29,8 +52,7 @@ function respond(int $status, array $payload): never
 
 function configuredToken(): string
 {
-    $token = getenv('LIFE_HUB_UPDATE_TOKEN');
-    return is_string($token) ? trim($token) : '';
+    return updateEnv('LIFE_HUB_UPDATE_TOKEN');
 }
 
 function requestToken(): string
@@ -47,7 +69,7 @@ function requestToken(): string
 
 function updateMode(): string
 {
-    $mode = strtolower(trim((string) (getenv('LIFE_HUB_UPDATE_MODE') ?: 'token')));
+    $mode = strtolower(updateEnv('LIFE_HUB_UPDATE_MODE', 'token'));
     return in_array($mode, ['auto', 'token'], true) ? $mode : 'token';
 }
 
@@ -115,7 +137,7 @@ function sourceCheckoutPath(string $repository, string $branch): string
 
 function repositoryUrl(): string
 {
-    $configured = trim((string) (getenv('LIFE_HUB_UPDATE_REPOSITORY') ?: ''));
+    $configured = updateEnv('LIFE_HUB_UPDATE_REPOSITORY');
     return $configured !== '' ? $configured : 'https://github.com/Guyao146/Life-Dashboard.git';
 }
 
@@ -181,7 +203,7 @@ function remoteVersionFromCheckout(string $checkout): string
 function deployCheckout(string $source, string $target, string $relative = ''): int
 {
     $count = 0;
-    $preservedRootFiles = ['config.js', '.env'];
+    $preservedRootFiles = ['.env'];
     foreach (scandir($source) ?: [] as $name) {
         if ($name === '.' || $name === '..' || $name === '.git') {
             continue;
@@ -216,6 +238,30 @@ function deployCheckout(string $source, string $target, string $relative = ''): 
         $count++;
     }
     return $count;
+}
+
+function removeLegacyBrowserConfigs(string $target): void
+{
+    foreach (['config.js', 'config.example.js'] as $name) {
+        $path = $target . DIRECTORY_SEPARATOR . $name;
+        if (file_exists($path) && !@unlink($path)) {
+            throw new RuntimeException("无法删除遗留的浏览器配置文件：{$name}");
+        }
+    }
+}
+
+function removeLegacyPublicArtifacts(string $target): void
+{
+    removeLegacyBrowserConfigs($target);
+    foreach (['work', 'outputs'] as $name) {
+        $path = $target . DIRECTORY_SEPARATOR . $name;
+        if (file_exists($path)) {
+            removeDirectory($path);
+            if (file_exists($path)) {
+                throw new RuntimeException("无法删除遗留的公开开发目录：{$name}");
+            }
+        }
+    }
 }
 
 function readVersionCache(string $path, int $maxAge = 300): ?array
@@ -267,7 +313,7 @@ if ($command === 'update' && $mode === 'token') {
 }
 
 $repository = __DIR__;
-$branch = getenv('LIFE_HUB_UPDATE_BRANCH') ?: 'main';
+$branch = updateEnv('LIFE_HUB_UPDATE_BRANCH', 'main');
 if (!preg_match('/^[A-Za-z0-9._\/-]+$/', $branch)) {
     respond(500, ['ok' => false, 'error' => '升级分支配置无效']);
 }
@@ -337,6 +383,7 @@ try {
         $responsePayload = ['ok' => true, 'cached' => false] + $cachePayload;
     } else {
         $files = deployCheckout($checkout, $repository);
+        removeLegacyPublicArtifacts($repository);
         @unlink($versionCache);
         $responseStatus = 200;
         $responsePayload = [
@@ -344,7 +391,7 @@ try {
             'message' => '升级完成',
             'commit' => $commit !== '' ? $commit : null,
             'files' => $files,
-            'output' => "已部署 {$files} 个文件，并保留 config.js 与 .env",
+            'output' => "已部署 {$files} 个文件、清理旧浏览器配置与开发产物，并保留服务器 .env",
         ];
     }
 } catch (Throwable $error) {

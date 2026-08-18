@@ -90,8 +90,8 @@
 
 ```
 现代浏览器
-
-支持 H5 的运行环境
+PHP 8.2（配置权限网关与一键升级接口）
+Nginx 或 Apache（必须禁止 Web 访问 .env）
 ```
 
 ---
@@ -106,41 +106,82 @@ git clone https://github.com/Guyao146/Life-Dashboard.git
 
 ## 配置修改
 
-项目只使用根目录中的一个 `config.js`。请直接填写 Authentik 公共客户端和 Home Assistant 连接信息：
+复制 `.env.example` 为服务器私密配置：
 
-```javascript
-window.LIFE_HUB_CONFIG = {
-  oidc: {
-    clientId: "填入 Authentik OIDC 客户端 ID",
-    authorize: "https://login.example.com/application/o/authorize/",
-    token: "https://login.example.com/application/o/token/",
-  },
-  homeAssistant: {
-    url: "https://home.example.com",
-    token: "填入 Home Assistant 长期访问令牌",
-  },
-};
+```bash
+cp .env.example .env
+chmod 600 .env
 ```
 
-> `config.js` 会发送到访问看板的浏览器，其中的 Home Assistant 令牌可被查看。请只在私密仓库与受保护的部署环境中使用，并采用最低权限专用账号。
+至少填写：
+
+```dotenv
+LIFE_HUB_OIDC_CLIENT_ID="Authentik 公共客户端 ID"
+LIFE_HUB_OIDC_AUTHORIZE_URL="https://login.example.com/application/o/authorize/"
+LIFE_HUB_OIDC_TOKEN_URL="https://login.example.com/application/o/token/"
+LIFE_HUB_OIDC_USERINFO_URL="https://login.example.com/application/o/userinfo/"
+
+LIFE_HUB_ADMIN_GROUPS="Life Dashboard Admins"
+LIFE_HUB_ADMIN_USERS=""
+LIFE_HUB_ADMIN_EMAILS=""
+
+LIFE_HUB_HA_URL="https://home.example.com"
+LIFE_HUB_HA_TOKEN="Home Assistant 长期访问令牌"
+```
+
+管理员可按 Authentik **组 / 用户名 / 邮箱** 任意一种白名单判定，多个值用逗号分隔。三种白名单全部为空时，后端默认拒绝所有私密配置请求。
+
+如果使用组白名单，请确认 Authentik 的 OAuth/OIDC Scope Mapping 会在 UserInfo 的 `groups` 字段中返回组名；否则请使用用户名或邮箱白名单。
+
+配置加载流程：
+
+1. 未登录浏览器只可通过 `config.php?action=public` 获取 OIDC 公共参数；
+2. Authentik 登录完成后，浏览器把 access token 发送给同域 `config.php?action=private`；
+3. PHP 服务端调用 Authentik UserInfo 校验令牌与管理员身份；
+4. 只有管理员才会收到 Home Assistant 地址与令牌。
+
+> Home Assistant Token 最终仍需发送到已通过校验的管理员浏览器才能由前端调用 HA API，但普通用户、未登录用户和本地前端账号无法获取它。
+
+### Nginx 必须禁止 `.env`
+
+`.env` 放在 Web 根目录时**不会天然安全**。请把 `nginx-life-dashboard.conf.example` 中的规则加入站点 `server {}`，至少包含：
+
+```nginx
+location ~ /\.(?!well-known(?:/|$)) {
+    return 404;
+}
+location = /config.js { return 404; }
+location = /config.example.js { return 404; }
+```
+
+PHP FastCGI 必须传递 `Authorization` 头，否则管理员校验拿不到 access token：
+
+```nginx
+fastcgi_param HTTP_AUTHORIZATION $http_authorization;
+```
+
+应用配置后执行：
+
+```bash
+nginx -t && systemctl reload nginx
+curl -i https://life.example.com/.env
+```
+
+最后一个请求必须返回 `404` 或 `403`，绝不能返回 `.env` 内容。更安全的做法是把 `.env` 放在 Web 根目录之外，并通过 `LIFE_HUB_ENV_FILE=/安全路径/life-dashboard.env` 指定。
 
 ---
 
 ## 🔑 本地账号密码登录（可选）
 
-登录卡片在 OAuth 按钮上方提供账号密码登录，**纯前端 PBKDF2-SHA256 校验**，不需要任何后端服务，适合静态托管。
+登录卡片在 OAuth 按钮上方提供账号密码登录，密码使用浏览器端 PBKDF2-SHA256 校验；用户名与哈希由 PHP 公开配置接口提供。
 
-在 `config.js` 中配置 `localAuth`：
+在 `.env` 中配置本地登录：
 
-```javascript
-localAuth: {
-  username: "admin",
-  pbkdf2: {
-    salt: "base64 盐",
-    hash: "base64 密码哈希",
-    iterations: 310000,
-  },
-},
+```dotenv
+LIFE_HUB_LOCAL_AUTH_USERNAME="admin"
+LIFE_HUB_LOCAL_AUTH_SALT="base64 盐"
+LIFE_HUB_LOCAL_AUTH_HASH="base64 密码哈希"
+LIFE_HUB_LOCAL_AUTH_ITERATIONS="310000"
 ```
 
 生成新的密码哈希：在任意 HTTPS 页面（或 localhost）的浏览器控制台运行：
@@ -153,7 +194,7 @@ const e = a => btoa(String.fromCharCode(...a));
 JSON.stringify({ salt: e(s), hash: e(new Uint8Array(b)), iterations: 310000 });
 ```
 
-> ⚠️ 本地登录属于体验层门槛：哈希会随 `config.js` 下发到浏览器，无法抵御能读取源码的访问者。真正的访问控制请依赖 Authentik OAuth 与受保护的部署环境。本地登录同样要求 HTTPS（localhost 除外）。
+> ⚠️ 本地登录属于体验层门槛：哈希会由公开配置接口下发到浏览器，无法抵御能读取源码的访问者。本地登录只允许进入不含私密 HA 数据的看板，**不能解锁 Home Assistant Token**。真正的管理员身份由 Authentik UserInfo 校验。
 
 ---
 
@@ -225,7 +266,7 @@ JSON.stringify({ salt: e(s), hash: e(new Uint8Array(b)), iterations: 310000 });
 
 3. 确保服务器已经配置 GitHub 仓库的读取凭证（公开仓库可直接使用 HTTPS，私有仓库建议使用只读 Deploy Key）；
 4. 确保 PHP 用户可写 PHP 系统临时目录；执行升级时还需能写站点目录，并允许 PHP 使用 `proc_open` 执行 `git`；
-5. 在设置 → 版本与更新中点击“检查更新”。检测到远端版本更高时，点击“升级到 vX.Y.Z”，PHP 会刷新临时浅克隆并部署文件。服务器本地的 `config.js`、`.env` 和 `.git` 不会被覆盖。
+5. 在设置 → 版本与更新中点击“检查更新”。检测到远端版本更高时，点击“升级到 vX.Y.Z”，PHP 会刷新临时浅克隆并部署文件。服务器本地的 `.env` 和 `.git` 不会被覆盖；遗留 `config.js` 会被删除。
 
 如果你明确希望“前端点升级就直接拉取”，可以改成无密钥模式：
 
@@ -236,7 +277,16 @@ LIFE_HUB_UPDATE_BRANCH="main"
 
 `auto` 模式不需要输入密钥，但任何能访问 `update.php` 的人都可以触发一次固定分支的升级。因此建议把 `update.php` 放到反向代理的访问控制后面；否则请使用推荐的 `token` 模式。
 
-`update.php` 只接受同源 POST、校验升级指令，并且只允许拉取 `LIFE_HUB_UPDATE_BRANCH` 指定的分支（默认 `main`），同时使用文件锁防止并发升级。升级密钥不会写入仓库，也不会下发到页面；不要把它放进 `config.js`。
+`update.php` 只接受同源 POST、校验升级指令，并且只允许拉取 `LIFE_HUB_UPDATE_BRANCH` 指定的分支（默认 `main`），同时使用文件锁防止并发升级。升级密钥只保存在 `.env` 或 PHP-FPM 环境变量中。
+
+### 从旧 `config.js` 迁移
+
+1. **先**创建完整 `.env` 并配置 Nginx 点文件拒绝规则；
+2. 确认 `GET /config.php?action=public` 能返回 OIDC 公共参数；
+3. 部署 `0.6.0` 文件；升级器会删除遗留 `config.js`；
+4. 立即在 Home Assistant 撤销旧长期访问令牌并生成新令牌写入 `.env`；
+5. 如果旧 `config.js` 曾提交到 Git，即使仓库私有，也应视为已经泄露并轮换其中所有密钥；
+6. 使用普通 Authentik 用户测试 `action=private` 返回 `403`，管理员账号应返回 `200`。
 
 前端版本检查同样通过 `update.php` 完成。PHP 每 5 分钟最多刷新一次临时浅克隆并读取其中的 `version.js`；浏览器不会再请求 GitHub Raw 或 CDN，因此不受浏览器侧 CORS、429 和 CDN 暂时故障影响。
 

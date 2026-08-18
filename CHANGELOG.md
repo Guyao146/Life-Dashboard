@@ -6,6 +6,16 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [0.6.0] - 2026-08-18
+
+### 安全
+
+- 移除浏览器可直接加载的 `config.js`，所有运行配置迁移到服务器 `.env`。
+- 新增 PHP 配置网关：登录前仅返回 OIDC 公共参数；Authentik 校验为管理员后才返回 Home Assistant 地址与令牌。
+- 管理员支持按 Authentik 组、用户名或邮箱白名单判定；未配置白名单时默认拒绝。
+- 新增 Nginx 点文件与旧配置文件拒绝访问示例，本地前端登录不再具有解锁私密配置的能力。
+- 升级到新架构后强制删除线上遗留的 `config.js`、`config.example.js`、`work/` 与 `outputs/`，避免旧令牌或开发快照继续暴露。
+
 ## [0.5.10] - 2026-08-18
 
 ### 修复
@@ -75,6 +85,7 @@
 - 恢复 Authentik 公共客户端配置的默认加载，私有 `config.js` 缺失时仍可登录。
 - 登录配置加载前禁用登录按钮，并在配置异常时显示明确错误。
 
+[0.6.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.6.0
 [0.5.10]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.10
 [0.5.9]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.9
 [0.5.8]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.8

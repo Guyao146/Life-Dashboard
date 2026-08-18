@@ -8,18 +8,25 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     const redirectUri=location.origin+location.pathname;
     let HA=null;
     async function loadRuntimeConfig(){
-      const config=window.LIFE_HUB_CONFIG;
+      const response=await fetch('config.php?action=public',{cache:'no-store'}),config=await response.json();
+      if(!response.ok||!config.ok)throw new Error(config.error||`公开配置接口返回 HTTP ${response.status}`);
       const missing=[];
       if(!config?.oidc?.clientId)missing.push('oidc.clientId');
       if(!config?.oidc?.authorize)missing.push('oidc.authorize');
       if(!config?.oidc?.token)missing.push('oidc.token');
-      if(!config?.homeAssistant?.url)missing.push('homeAssistant.url');
-      if(!config?.homeAssistant?.token)missing.push('homeAssistant.token');
-      if(missing.length)throw new Error(`config.js 配置缺失：${missing.join('、')}`);
+      if(missing.length)throw new Error(`.env 公开配置缺失：${missing.join('、')}`);
       OIDC={...config.oidc};
       const localAuth=config.localAuth;
       LOCAL=localAuth?.username&&localAuth?.pbkdf2?.salt&&localAuth?.pbkdf2?.hash?{username:String(localAuth.username),pbkdf2:{salt:localAuth.pbkdf2.salt,hash:localAuth.pbkdf2.hash,iterations:Number(localAuth.pbkdf2.iterations)||310000}}:null;
+    }
+    async function loadPrivateRuntimeConfig(){
+      const session=readSession('life-hub-oidc'),token=session?.access_token;
+      if(!token)throw new Error('只有 Authentik 管理员登录可以加载 Home Assistant 私密配置');
+      const response=await fetch('config.php?action=private',{cache:'no-store',headers:{Authorization:'Bearer '+token}}),config=await response.json();
+      if(!response.ok||!config.ok)throw new Error(config.error||`私密配置接口返回 HTTP ${response.status}`);
+      if(!config?.homeAssistant?.url||!config?.homeAssistant?.token)throw new Error('.env 中缺少 Home Assistant 配置');
       HA={...config.homeAssistant,url:String(config.homeAssistant.url).replace(/\/$/,'')};
+      return config.identity||null;
     }
     const b64url=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replaceAll('+','-').replaceAll('/','_').replaceAll('=','');
     async function pkce(){const bytes=crypto.getRandomValues(new Uint8Array(48)),verifier=b64url(bytes),digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier));return {verifier,challenge:b64url(digest)}}
@@ -95,7 +102,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       event.preventDefault();
       const submit=$('#auth-submit'),username=$('#auth-user').value.trim(),password=$('#auth-pass').value;
       loginError('');
-      if(!LOCAL){loginError('本地账号未配置：请在 config.js 的 localAuth 中填写账号信息');return}
+      if(!LOCAL){loginError('本地账号未配置：请在服务器 .env 中填写本地登录信息');return}
       if(!window.isSecureContext){loginError('本地登录需要 HTTPS 部署（localhost 除外）');return}
       const lock=readSession(localLockKey);
       if(lock?.until>Date.now()){loginError(`尝试次数过多，请 ${Math.ceil((lock.until-Date.now())/1000)} 秒后重试`);return}
@@ -250,7 +257,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     function controlAction(s){const domain=s.entity_id.split('.')[0],active=isActive(s);if(domain==='cover')return active?'close_cover':'open_cover';if(domain==='lock')return s.state==='unlocked'?'lock':'unlock';if(domain==='vacuum')return ['cleaning','returning'].includes(s.state)?'return_to_base':'start';if(['button','input_button'].includes(domain))return 'press';if(domain==='script')return 'turn_on';return active?'turn_off':'turn_on'}
     function controlLabel(s){const action=controlAction(s);return ({close_cover:'关闭',open_cover:'打开',lock:'上锁',unlock:'解锁',return_to_base:'返回充电',start:'启动',press:'按下',turn_on:'开启',turn_off:'关闭'})[action]||'控制设备'}
     async function controlEntity(s){try{const current=await api(`/api/states/${s.entity_id}`,{}),domain=s.entity_id.split('.')[0],action=controlAction(current);await api(`/api/services/${domain}/${action}`,{},{method:'POST',body:JSON.stringify({entity_id:s.entity_id})});$('#device-modal').classList.remove('show');await sync({});notice(`「${label(s)}」已${controlLabel(current)}`)}catch(err){notice(err.message)}}
-    async function api(path,_cfg,options={}){if(!HA?.url||!HA?.token)throw new Error('Home Assistant 配置缺失，请检查 config.js');const headers={Authorization:'Bearer '+HA.token,...(options.headers||{})};if(options.body)headers['Content-Type']='application/json';const r=await fetch(HA.url.replace(/\/$/,'')+path,{...options,headers});if(!r.ok){const body=(await r.text()).replace(/\s+/g,' ').slice(0,500);throw new Error(`${options.method||'GET'} ${path} 返回 HTTP ${r.status}${body?`：${body}`:''}`)}try{return await r.json()}catch{throw new Error(`${options.method||'GET'} ${path} 返回了无法解析的 JSON 响应`)}}
+    async function api(path,_cfg,options={}){if(!HA?.url||!HA?.token)throw new Error('Home Assistant 私密配置尚未由管理员解锁');const headers={Authorization:'Bearer '+HA.token,...(options.headers||{})};if(options.body)headers['Content-Type']='application/json';const r=await fetch(HA.url.replace(/\/$/,'')+path,{...options,headers});if(!r.ok){const body=(await r.text()).replace(/\s+/g,' ').slice(0,500);throw new Error(`${options.method||'GET'} ${path} 返回 HTTP ${r.status}${body?`：${body}`:''}`)}try{return await r.json()}catch{throw new Error(`${options.method||'GET'} ${path} 返回了无法解析的 JSON 响应`)}}
     function registrySocketUrl(){const url=new URL(HA.url);url.protocol=url.protocol==='https:'?'wss:':'ws:';url.pathname=url.pathname.replace(/\/$/,'')+'/api/websocket';url.search='';url.hash='';return url.toString()}
     function registryCommand(type){return new Promise((resolve,reject)=>{const socket=new WebSocket(registrySocketUrl()),timer=setTimeout(()=>{socket.close();reject(new Error('区域注册表同步超时'))},10000);let settled=false;const fail=message=>{if(settled)return;settled=true;clearTimeout(timer);socket.close();reject(new Error(message))};socket.onmessage=event=>{try{const message=JSON.parse(event.data);if(message.type==='auth_required')socket.send(JSON.stringify({type:'auth',access_token:HA.token}));else if(message.type==='auth_invalid')fail('Home Assistant WebSocket 认证失败');else if(message.type==='auth_ok')socket.send(JSON.stringify({id:1,type}));else if(message.type==='result'&&message.id===1){if(settled)return;settled=true;clearTimeout(timer);socket.close();message.success?resolve(message.result):reject(new Error(message.error?.message||`${type} 读取失败`))}}catch(error){fail('Home Assistant WebSocket 返回了无效数据')}};socket.onerror=()=>fail('无法连接 Home Assistant WebSocket')})}
     async function syncRegistry(force=false){if(!force&&registrySyncedAt&&Date.now()-registrySyncedAt<5*60*1000)return registry;const [areas,devices,entities]=await Promise.all([registryCommand('config/area_registry/list'),registryCommand('config/device_registry/list'),registryCommand('config/entity_registry/list')]);registry={areas:Array.isArray(areas)?areas:[],devices:Array.isArray(devices)?devices:[],entities:Array.isArray(entities)?entities:[]};registrySyncedAt=Date.now();return registry}
@@ -271,7 +278,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     function beginAutoSync(cfg){if(syncTimer)clearInterval(syncTimer);syncTimer=setInterval(()=>sync(cfg).catch(()=>{$('#ha-status').textContent='同步失败'}),30000)}
     $('#connect-form').onsubmit=async e=>{
       e.preventDefault();
-      if(!HA?.url||!HA?.token){notice('请先在 config.js 中填写 Home Assistant 地址和长期访问令牌');return}
+      if(!HA?.url||!HA?.token){notice('请使用 Authentik 管理员账号登录以解锁 Home Assistant');return}
       try{
         notice('正在连接…');
         await sync(HA);
@@ -280,15 +287,15 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
         notice(`Home Assistant 已连接，读取到 ${latestStates.length} 个实体、${registry.areas.length} 个区域`)
       }catch(err){notice(err.message)}
     };
-    loadRuntimeConfig().then(()=>{setLoginReady(true);return authenticate()}).then(ok=>{
+    loadRuntimeConfig().then(()=>{setLoginReady(true);return authenticate()}).then(async ok=>{
       if(!ok)return;
-      if(!HA?.url||!HA?.token){
-        $('#ha-status').textContent='待连接';
-        $('#environment').textContent='登录成功 · 请配置 Home Assistant';
-        notice('登录成功，请先配置 Home Assistant');
+      try{await loadPrivateRuntimeConfig()}catch(error){
+        $('#ha-status').textContent='管理员权限未解锁';
+        $('#environment').textContent='已登录 · Home Assistant 私密配置受保护';
+        notice(error.message);
         return;
       }
-      sync(HA).then(()=>beginAutoSync(HA)).catch(()=>notice('Home Assistant 连接失败，请检查 config.js 与 CORS 设置'))
+      sync(HA).then(()=>beginAutoSync(HA)).catch(()=>notice('Home Assistant 连接失败，请检查 .env 与 CORS 设置'))
     }).catch(e=>{setLoginReady(false);loginError(e.message);$('#app-loader').classList.add('hidden')});
     document.querySelectorAll('.quick-grid button').forEach(b=>b.addEventListener('click',()=>{if(sessionStorage.getItem('life-hub-oidc'))return;b.classList.toggle('on');b.querySelector('small').textContent=b.classList.contains('on')?'已开启':'已关闭'}));
     /* ===== 外观主题：日间 / 夜间 / 跟随系统 ===== */

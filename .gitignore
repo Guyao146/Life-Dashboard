@@ -4,6 +4,9 @@
 *.py[cod]
 
 .env
-debug.log
+.env.*
+!.env.example
 config.js
+config.example.js
+debug.log
 .life-hub-update.lock
