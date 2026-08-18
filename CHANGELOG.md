@@ -6,6 +6,14 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [0.5.9] - 2026-08-18
+
+### 修复
+
+- 将升级锁移到 PHP 系统临时目录，修复站点根目录不可写时版本检查误报 `409 Conflict` 的问题。
+- 合并前端并发版本检查；后端在升级锁繁忙时短暂等待，并可读取现有远端引用降级返回。
+- 禁止 PHP 文件权限 Warning 污染 JSON 响应，并区分锁目录不可写与真正的并发任务。
+
 ## [0.5.8] - 2026-08-17
 
 ### 修复
@@ -60,6 +68,7 @@
 - 恢复 Authentik 公共客户端配置的默认加载，私有 `config.js` 缺失时仍可登录。
 - 登录配置加载前禁用登录按钮，并在配置异常时显示明确错误。
 
+[0.5.9]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.9
 [0.5.8]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.8
 [0.5.7]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.7
 [0.5.6]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.5.6

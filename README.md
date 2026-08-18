@@ -223,7 +223,7 @@ JSON.stringify({ salt: e(s), hash: e(new Uint8Array(b)), iterations: 310000 });
    ```
 
 3. 确保服务器已经配置 GitHub 仓库的读取凭证（公开仓库可直接使用 HTTPS，私有仓库建议使用只读 Deploy Key）；
-4. 确保 PHP 用户对站点目录、`.git` 以及创建临时锁文件有读写权限，并允许 PHP 使用 `proc_open` 执行 `git`；
+4. 确保 PHP 用户对站点目录与 `.git` 有执行升级所需的读写权限、PHP 系统临时目录可写，并允许 PHP 使用 `proc_open` 执行 `git`；
 5. 在设置 → 版本与更新中点击“检查更新”。检测到远端版本更高时，点击“升级到 vX.Y.Z”，输入上述密钥即可执行 `git fetch` + `git pull --ff-only`。
 
 如果你明确希望“前端点升级就直接拉取”，可以改成无密钥模式：

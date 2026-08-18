@@ -99,6 +99,22 @@ function versionCachePath(string $repository, string $branch): string
         . 'life-hub-version-' . hash('sha256', $repository . ':' . $branch) . '.json';
 }
 
+function updateLockPath(string $repository, string $branch): string
+{
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . DIRECTORY_SEPARATOR
+        . 'life-hub-update-' . hash('sha256', $repository . ':' . $branch) . '.lock';
+}
+
+function remoteVersionFromGit(string $repository, string $branch): string
+{
+    $remoteFile = runGit($repository, 'git show ' . escapeshellarg('origin/' . $branch . ':version.js'));
+    if ($remoteFile['exitCode'] !== 0) {
+        throw new RuntimeException('无法读取远端 version.js：' . ($remoteFile['output'] ?: '未知错误'));
+    }
+    return parseReleaseVersion($remoteFile['output']);
+}
+
 function readVersionCache(string $path, int $maxAge = 300): ?array
 {
     $modifiedAt = @filemtime($path);
@@ -161,12 +177,42 @@ if ($command === 'check') {
     }
 }
 
-$lockPath = __DIR__ . DIRECTORY_SEPARATOR . '.life-hub-update.lock';
-$lock = fopen($lockPath, 'c');
-if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
-    if (is_resource($lock)) {
-        fclose($lock);
+$lockPath = updateLockPath($repository, $branch);
+$lock = @fopen($lockPath, 'c');
+if ($lock === false) {
+    respond(500, ['ok' => false, 'error' => 'PHP 临时目录不可写，无法创建升级锁']);
+}
+
+$hasLock = flock($lock, LOCK_EX | LOCK_NB);
+if (!$hasLock && $command === 'check') {
+    // 页面自动检查和手动检查可能同时发生；短暂等待正在执行的任务。
+    for ($attempt = 0; $attempt < 10 && !$hasLock; $attempt++) {
+        usleep(100000);
+        $hasLock = flock($lock, LOCK_EX | LOCK_NB);
     }
+    if (!$hasLock) {
+        try {
+            // Git fetch 正忙时读取服务器已有的 origin/<branch> 引用，避免把检查误报为 409。
+            $remoteVersion = remoteVersionFromGit($repository, $branch);
+            fclose($lock);
+            respond(200, [
+                'ok' => true,
+                'cached' => false,
+                'stale' => true,
+                'busy' => true,
+                'remoteVersion' => $remoteVersion,
+                'branch' => $branch,
+                'checkedAt' => gmdate('c'),
+            ]);
+        } catch (Throwable $error) {
+            fclose($lock);
+            respond(409, ['ok' => false, 'error' => '升级任务正在执行，请稍后再检查']);
+        }
+    }
+}
+
+if (!$hasLock) {
+    fclose($lock);
     respond(409, ['ok' => false, 'error' => '已有升级任务正在执行，请稍后再试']);
 }
 
@@ -178,11 +224,7 @@ try {
     }
 
     if ($command === 'check') {
-        $remoteFile = runGit($repository, 'git show ' . escapeshellarg('origin/' . $branch . ':version.js'));
-        if ($remoteFile['exitCode'] !== 0) {
-            throw new RuntimeException('无法读取远端 version.js：' . ($remoteFile['output'] ?: '未知错误'));
-        }
-        $remoteVersion = parseReleaseVersion($remoteFile['output']);
+        $remoteVersion = remoteVersionFromGit($repository, $branch);
         $cachePayload = [
             'remoteVersion' => $remoteVersion,
             'branch' => $branch,
@@ -212,7 +254,6 @@ try {
 } finally {
     flock($lock, LOCK_UN);
     fclose($lock);
-    @unlink($lockPath);
 }
 
 respond($responseStatus, $responsePayload);
