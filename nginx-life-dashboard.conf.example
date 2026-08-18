@@ -14,7 +14,5 @@ location = /config.example.js {
 }
 
 # Keep your existing PHP 8.2 location/FastCGI configuration for config.php
-# and update.php. Make sure the Authorization header reaches PHP-FPM:
-#   fastcgi_param HTTP_AUTHORIZATION $http_authorization;
-# Reload Nginx after validating the final configuration:
+# and update.php. Reload Nginx after validating the final configuration:
 #   nginx -t && systemctl reload nginx
