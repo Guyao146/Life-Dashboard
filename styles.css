@@ -948,21 +948,38 @@ main {
 .app-loader {
   position:fixed;
   inset:0;
-  z-index:90;
+  z-index:110;
   background:rgba(237,240,237,.96);
   display:grid;
   place-items:center;
-  transition:opacity .35s
+  transition:opacity .35s,visibility .35s
 }
 
 .app-loader.hidden {
   opacity:0;
+  visibility:hidden;
   pointer-events:none
 }
 
 .loader-box {
+  width:min(320px,calc(100vw - 48px));
   text-align:center;
-  color:var(--muted)
+  color:var(--muted);
+  animation:loader-enter .42s cubic-bezier(.22,1,.36,1) both
+}
+
+.loader-box b {
+  display:block;
+  color:var(--ink);
+  font-size:16px;
+  letter-spacing:.02em
+}
+
+.loader-box > span {
+  display:block;
+  min-height:20px;
+  margin-top:8px;
+  font-size:12px
 }
 
 .spinner {
@@ -973,6 +990,34 @@ main {
   border-radius:50%;
   margin:0 auto 13px;
   animation:spin .7s linear infinite
+}
+
+.loader-progress {
+  display:flex;
+  justify-content:center;
+  gap:6px;
+  margin-top:22px
+}
+
+.loader-progress i {
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:#b9d9d0;
+  animation:loader-pulse 1.15s ease-in-out infinite
+}
+
+.loader-progress i:nth-child(2) { animation-delay:.15s }
+.loader-progress i:nth-child(3) { animation-delay:.3s }
+
+@keyframes loader-enter {
+  from { opacity:0; transform:translateY(10px) scale(.98) }
+  to { opacity:1; transform:none }
+}
+
+@keyframes loader-pulse {
+  0%,100% { transform:scale(.75); background:#b9d9d0 }
+  50% { transform:scale(1.2); background:var(--accent) }
 }
 
 @keyframes spin {
@@ -1571,8 +1616,6 @@ main {
 .settings-version>strong { color:var(--accent); font:600 17px 'DM Mono',monospace; letter-spacing:-.04em }
 .version-actions { display:flex; gap:8px }
 .version-actions .btn { flex:1; display:flex; align-items:center; justify-content:center; text-align:center; padding:9px 10px; font-size:12px; text-decoration:none }
-.version-actions .update-action { background:#d97a3f; color:#fff }
-.version-actions .update-action:hover { background:#c96930 }
 .version-status { min-height:16px; color:var(--muted); font-size:11px }
 .version-status:before { content:'●'; color:var(--accent); margin-right:5px }
 .version-actions button:disabled { cursor:wait; opacity:.65 }
@@ -2367,3 +2410,5 @@ main {
 @media(max-width:540px){.upgrade-head-actions .upgrade-secure{display:none}.upgrade-hero,.upgrade-process{padding:22px}.upgrade-console .upgrade-steps{grid-template-columns:1fr}.upgrade-hero h1{font-size:38px}.upgrade-hero .upgrade-versions{padding:14px}.upgrade-state-card{padding:18px}.upgrade-log-panel{padding:20px}.dsh-pairing-code .btn{margin-left:0}}
 
 .workspace-detail-modal-box .card-head>div:first-child{min-width:0;flex:1}.workspace-detail-modal-box .card-head>div:first-child h2{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.workspace-detail-modal-box .card-head>.more{width:30px;height:30px;display:grid;place-items:center;flex:none}.workspace-detail-launcher{position:fixed;right:78px;bottom:20px;z-index:91;width:50px;height:50px;display:none;border:0;border-radius:16px;background:#4c7dff;color:#fff;font-size:22px;box-shadow:0 12px 30px rgba(76,125,255,.28);cursor:pointer}.workspace-detail-launcher.show{display:grid;place-items:center}.workspace-detail-launcher:hover{transform:translateY(-3px)}
+
+@media (prefers-reduced-motion:reduce) { .spinner,.loader-progress i,.loader-box { animation:none!important } }

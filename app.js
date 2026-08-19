@@ -44,9 +44,11 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       const p=new URLSearchParams({client_id:OIDC.clientId,response_type:'code',redirect_uri:redirectUri,scope:'openid profile email offline_access',state,code_challenge:challenge,code_challenge_method:'S256'});
       location.assign(OIDC.authorize+'?'+p)
     }
-    function enterDashboard(){
+    function setLoaderStage(title='正在加载你的生活中枢',detail='正在准备安全连接…',stage=0){const loader=$('#app-loader');if(!loader)return;$('#loader-title').textContent=title;$('#loader-detail').textContent=detail;loader.dataset.stage=String(stage);loader.classList.remove('hidden');loader.setAttribute('aria-busy','true')}
+    function finishDashboardLoad(){const loader=$('#app-loader');if(!loader)return;loader.setAttribute('aria-busy','false');loader.classList.add('hidden')}
+    function enterDashboard(keepLoader=false){
       $('#auth-gate').classList.add('hidden');
-      $('#app-loader').classList.add('hidden')
+      if(!keepLoader)finishDashboardLoad()
     }
     function readSession(key){try{return JSON.parse(sessionStorage.getItem(key)||'null')}catch(err){sessionStorage.removeItem(key);return null}}
     function readOidcSession(){try{const stored=JSON.parse(localStorage.getItem(oidcSessionKey)||'null');if(stored)return stored;const legacy=readSession(oidcSessionKey);if(legacy){localStorage.setItem(oidcSessionKey,JSON.stringify(legacy));sessionStorage.removeItem(oidcSessionKey)}return legacy}catch(err){localStorage.removeItem(oidcSessionKey);sessionStorage.removeItem(oidcSessionKey);return null}}
@@ -56,7 +58,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     async function performOidcRefresh(session){const latest=readOidcSession();if(!latest?.refresh_token||latest.rememberUntil<=Date.now())throw new Error('登录已过期');if(latest.refresh_token!==session.refresh_token||Number(latest.expiresAt)>Number(session.expiresAt))return latest;const form=new URLSearchParams({grant_type:'refresh_token',client_id:OIDC.clientId,refresh_token:latest.refresh_token});const response=await fetch(OIDC.token,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form});const tokens=await response.json().catch(()=>({}));if(!response.ok){const current=readOidcSession();if(current&&(current.refresh_token!==latest.refresh_token||Number(current.expiresAt)>Number(latest.expiresAt)))return current;throw new Error(tokens.error_description||tokens.error||'登录续期失败')}if(!tokens?.access_token)throw new Error('续期结果缺少 access_token');return saveOidcSession(tokens,latest)}
     async function refreshOidcSession(session){if(oidcRefreshPromise)return oidcRefreshPromise;const run=()=>performOidcRefresh(session);oidcRefreshPromise=(navigator.locks?.request?navigator.locks.request('life-hub-oidc-refresh',{mode:'exclusive'},run):run()).catch(error=>{const current=readOidcSession();if(current&&(current.refresh_token!==session.refresh_token||Number(current.expiresAt)>Number(session.expiresAt)))return current;clearOidcSession();throw error}).finally(()=>{oidcRefreshPromise=null});return oidcRefreshPromise}
     async function validOidcSession(forceRefresh=false){const session=readOidcSession();if(!session||session.rememberUntil<=Date.now()){clearOidcSession();return null}if(!forceRefresh&&session.access_token&&session.expiresAt>Date.now()+60000)return session;try{return await refreshOidcSession(session)}catch(error){return null}}
-    function returnToLogin(message='登录已失效，请重新登录'){clearOidcSession();HA=null;if(workspaceTimer){clearInterval(workspaceTimer);workspaceTimer=0}if(syncTimer){clearInterval(syncTimer);syncTimer=null}$('#auth-gate').classList.remove('hidden');$('#app-loader').classList.add('hidden');loginError(message);history.replaceState({},document.title,redirectUri)}
+    function returnToLogin(message='登录已失效，请重新登录'){clearOidcSession();HA=null;if(workspaceTimer){clearInterval(workspaceTimer);workspaceTimer=0}if(syncTimer){clearInterval(syncTimer);syncTimer=null}$('#auth-gate').classList.remove('hidden');finishDashboardLoad();loginError(message);history.replaceState({},document.title,redirectUri)}
     async function oidcFetch(url,options={},retry=true){const session=await validOidcSession();if(!session){returnToLogin();throw new Error('登录已失效')}const headers={...(options.headers||{}),Authorization:'Bearer '+session.access_token},response=await fetch(url,{...options,headers});if(response.status===401&&retry){const refreshed=await validOidcSession(true);if(refreshed)return oidcFetch(url,options,false)}if(response.status===401){returnToLogin();throw new Error('登录已失效')}return response}
     async function authenticate(){
       const params=new URLSearchParams(location.search),stored=await validOidcSession();
@@ -65,7 +67,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
         throw new Error(`验证服务拒绝登录：${params.get('error_description')||params.get('error')}`);
       }
       if(stored?.access_token){
-        enterDashboard();
+        setLoaderStage('正在恢复登录','正在安全验证你的登录状态…',1);enterDashboard(true);
         return true
       }
       if(!params.get('code')){
@@ -77,6 +79,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
         $('#app-loader').classList.add('hidden');
         return false
       }
+      setLoaderStage('正在确认登录成功','正在与樱落怡然验证服务建立安全会话…',1);
       const pending=readSession('life-hub-pkce');
       if(!pending||pending.state!==params.get('state'))throw new Error('登录状态校验失败，请重新登录');
       const form=new URLSearchParams({grant_type:'authorization_code',client_id:OIDC.clientId,code:params.get('code'),redirect_uri:redirectUri,code_verifier:pending.verifier});
@@ -86,7 +89,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       if(!tokens?.access_token)throw new Error('验证服务返回的登录结果缺少 access_token');
       saveOidcSession(tokens);
       sessionStorage.removeItem('life-hub-pkce');
-      history.replaceState({},document.title,redirectUri);enterDashboard();return true
+      history.replaceState({},document.title,redirectUri);setLoaderStage('登录成功','正在验证管理员权限…',2);enterDashboard(true);return true
     }
     $('#auth-login').onclick=()=>{
       loginError('正在跳转到 验证服务…');
@@ -195,12 +198,11 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     function renderViewIntro(view,animate=true){const meta=viewMeta[view]||viewMeta.overview,elements=[$('#view-eyebrow'),$('#view-title'),$('#view-description')];elements[0].textContent=meta.eyebrow;elements[1].textContent=meta.title;elements[2].textContent=meta.description;if(!animate||matchMedia('(prefers-reduced-motion: reduce)').matches)return;elements.forEach((element,index)=>{if(typeof element.animate!=='function')return;element.getAnimations().forEach(animation=>animation.cancel());element.animate([{transform:'translateY(10px)',opacity:0,filter:'blur(3px)'},{transform:'translateY(0)',opacity:1,filter:'blur(0)'}],{duration:360,delay:index*48,easing:'cubic-bezier(.22,1,.36,1)',fill:'backwards'})})}
     function compareVersions(a,b){const parse=value=>{const match=String(value||'').trim().replace(/^v/i,'').match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?/);if(!match)return null;return {parts:match.slice(1,4).map(Number),pre:match[4]||''}},left=parse(a),right=parse(b);if(!left||!right)return null;for(let i=0;i<3;i++){if(left.parts[i]!==right.parts[i])return left.parts[i]>right.parts[i]?1:-1}if(left.pre===right.pre)return 0;if(!left.pre)return 1;if(!right.pre)return -1;return left.pre.localeCompare(right.pre,undefined,{numeric:true,sensitivity:'base'})}
     let pendingRemoteVersion='';
-    function setUpdateAvailable(version){pendingRemoteVersion=version||'';const button=$('#apply-update');if(button){button.hidden=!pendingRemoteVersion;button.disabled=false;button.textContent=pendingRemoteVersion?`升级到 v${pendingRemoteVersion}`:'升级到远端'}}
+    function setUpdateAvailable(version){pendingRemoteVersion=version||'';const dashboard=$('#upgrade-dashboard');if(dashboard)dashboard.href=pendingRemoteVersion?`upgrade.html?version=${encodeURIComponent(pendingRemoteVersion)}`:'upgrade.html'}
     let updateCheckPromise=null;
     function checkForUpdate(options={}){if(updateCheckPromise)return updateCheckPromise;updateCheckPromise=runUpdateCheck(options).finally(()=>{updateCheckPromise=null});return updateCheckPromise}
     async function runUpdateCheck(options={}){const status=$('#version-status'),button=$('#check-update');if(!status||!button)return null;button.disabled=true;if(!options.silent)status.textContent='正在检查远端版本…';try{const response=await fetch('update.php',{method:'POST',headers:{'X-Life-Hub-Update-Command':'check','Content-Type':'application/json'},body:'{}',cache:'no-store'});let data=null;try{data=await response.json()}catch(error){throw new Error(`版本接口返回 HTTP ${response.status}`)}if(!response.ok||!data.ok)throw new Error(data.error||`HTTP ${response.status}`);const remoteVersion=data.remoteVersion,localVersion=release?.version;if(!remoteVersion||!localVersion)throw new Error('版本格式无法识别');const comparison=compareVersions(remoteVersion,localVersion);if(comparison===null)throw new Error('版本号不是有效的语义化版本');if(comparison>0){setUpdateAvailable(remoteVersion);status.textContent=`发现新版本 v${remoteVersion}`;notice(`发现新版本 v${remoteVersion}，可在设置中升级`)}else if(comparison<0){setUpdateAvailable('');status.textContent=`本地 v${localVersion} 高于远程 v${remoteVersion}`;if(!options.silent)notice('当前部署版本高于远端版本')}else{setUpdateAvailable('');status.textContent='已是最新版本';if(!options.silent)notice('当前已经是最新版本')}return {remoteVersion,comparison}}catch(error){console.warn('版本检查失败：',error);if(!options.silent){status.textContent='检查失败，请稍后重试';notice(`版本检查失败：${error.message}`)}return null}finally{button.disabled=false}}
     async function requestUpdate(retry=true){const session=await validOidcSession();if(!session){returnToLogin();throw new Error('需要重新登录管理员账号')}const response=await fetch('update.php',{method:'POST',headers:{'X-Life-Hub-Update-Command':'update','Content-Type':'application/json'},body:JSON.stringify({version:pendingRemoteVersion,accessToken:session.access_token}),cache:'no-store'});let data=null;try{data=await response.json()}catch(error){throw new Error(`服务器返回 HTTP ${response.status}`)}if(response.status===401&&retry){const refreshed=await validOidcSession(true);if(refreshed)return requestUpdate(false);returnToLogin()}if(response.status===401){returnToLogin();throw new Error('登录已失效')}return {response,data}}
-    async function applyUpdate(){if(!pendingRemoteVersion)return;location.assign(`upgrade.html?version=${encodeURIComponent(pendingRemoteVersion)}`)}
     function setView(view){if(view===activeView)return;const before=new Map(visibleCards().map(card=>[card,card.getBoundingClientRect()]));activeView=view;document.querySelectorAll('[data-view]').forEach(item=>{const isActive=item.dataset.view===view;item.classList.toggle('active',isActive);if(item.closest('.nav,.mobile-nav'))item.setAttribute('aria-current',isActive?'page':'false')});renderViewIntro(view);applyView();if(view==='settings'){renderWidgetSettings();renderNavSettings();syncProfileSettings();renderThemeSettings();renderCountdownSettings();syncWeatherSettings();syncAiSettings();requestAnimationFrame(animateSettingsView)}else animateViewChange(before);window.scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})}
     document.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>setView(button.dataset.view));
     $('#profile-form').onsubmit=e=>{e.preventDefault();const name=$('#profile-name').value.trim().replace(/\s+/g,' ').slice(0,24);if(!name){notice('请输入你希望显示的称呼');$('#profile-name').focus();return}try{localStorage.setItem(displayNameKey,name)}catch(err){notice('浏览器阻止了称呼保存');return}$('#profile-name').value=name;renderedGreeting='';renderGreeting(new Date());notice('称呼已保存')};
@@ -221,7 +223,6 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     settingsGrid.addEventListener('dragend',()=>{if(!draggedSetting)return;draggedSetting.classList.remove('is-dragging');saveSettingsLayout({...settingsLayout(),order:[...settingsGrid.querySelectorAll('[data-setting-id]')].map(card=>card.dataset.settingId)});draggedSetting=null;scheduleSettingsMasonry();notice('设置卡片位置已保存')});
     $('#settings-logout').onclick=logout;
     $('#check-update').onclick=()=>checkForUpdate();
-    $('#apply-update').onclick=applyUpdate;
     applyView();
     checkForUpdate({silent:true});
     $('#refresh-home').onclick=()=>{registrySyncedAt=0;return sync({}).then(()=>notice('已刷新 Home Assistant 数据')).catch(err=>notice(err.message))};
@@ -325,7 +326,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       console.error('Home Assistant 日历同步失败：',error);
     }
     async function syncCalendar(states,cfg){try{const calendars=states.filter(s=>s.entity_id.startsWith('calendar.'));if(!calendars.length)return;const start=new Date(),end=new Date();start.setHours(0,0,0,0);end.setHours(23,59,59,999);const result=await api('/api/services/calendar/get_events?return_response',cfg,{method:'POST',body:JSON.stringify({entity_id:calendars.map(s=>s.entity_id),start_date_time:start.toISOString(),end_date_time:end.toISOString()})});const response=result.service_response||result;const events=calendars.flatMap(cal=>(response[cal.entity_id]?.events||[]).map(e=>({...e,calendar:label(cal)}))).sort((a,b)=>new Date(a.start.dateTime||a.start.date)-new Date(b.start.dateTime||b.start.date)).slice(0,4);if(!events.length)return;$('#agenda-source').textContent='Home Assistant 日历';$('#agenda-list').innerHTML=events.map(e=>{const allDay=!!e.start.date,time=allDay?'全天':new Date(e.start.dateTime).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false});return `<div class="agenda-row"><span class="agenda-time">${time}</span><div><div class="agenda-title">${escapeHtml(e.summary)}</div><div class="agenda-meta">${escapeHtml(e.location||e.calendar)}</div></div><span class="tag">${escapeHtml(e.calendar)}</span></div>`}).join('')}catch(error){calendarFailure(error)}}
-    async function sync(cfg){if(syncing)return;syncing=true;try{const states=await api('/api/states',cfg);latestStates=states;try{await syncRegistry()}catch(error){console.warn('Home Assistant 区域注册表同步失败，已降级为全部实体列表：',error)}const temp=environmentSensors(states,'temperature')[0]||entity(states,'sensor',['temperature','温度']),humidity=environmentSensors(states,'humidity')[0]||entity(states,'sensor',['humidity','湿度']);if(value(temp))$('#temperature').textContent=value(temp);$('#environment').textContent=[humidity&&value(humidity)?'湿度 '+value(humidity)+(humidity.attributes.unit_of_measurement||'%'):'已连接 Home Assistant','刚刚同步'].filter(Boolean).join(' · ');$('#ha-status').textContent=registry.areas.length?'实时同步 · 区域已连接':'实时同步';renderEnvironmentSlots(states);renderQuick(states);renderDevices(states);await syncCalendar(states,cfg).catch(()=>{});await syncTodo(states,cfg) }finally{syncing=false;$('#app-loader').classList.add('hidden')}}
+    async function sync(cfg){if(syncing)return;syncing=true;try{const states=await api('/api/states',cfg);latestStates=states;try{await syncRegistry()}catch(error){console.warn('Home Assistant 区域注册表同步失败，已降级为全部实体列表：',error)}const temp=environmentSensors(states,'temperature')[0]||entity(states,'sensor',['temperature','温度']),humidity=environmentSensors(states,'humidity')[0]||entity(states,'sensor',['humidity','湿度']);if(value(temp))$('#temperature').textContent=value(temp);$('#environment').textContent=[humidity&&value(humidity)?'湿度 '+value(humidity)+(humidity.attributes.unit_of_measurement||'%'):'已连接 Home Assistant','刚刚同步'].filter(Boolean).join(' · ');$('#ha-status').textContent=registry.areas.length?'实时同步 · 区域已连接':'实时同步';renderEnvironmentSlots(states);renderQuick(states);renderDevices(states);await syncCalendar(states,cfg).catch(()=>{});await syncTodo(states,cfg) }finally{syncing=false}}
     function beginAutoSync(cfg){if(syncTimer)clearInterval(syncTimer);syncTimer=setInterval(()=>sync(cfg).catch(()=>{$('#ha-status').textContent='同步失败'}),30000)}
     $('#connect-form').onsubmit=async e=>{
       e.preventDefault();
@@ -341,15 +342,18 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     loadRuntimeConfig().then(()=>{setLoginReady(true);return authenticate()}).then(async ok=>{
       if(!ok)return;
       if(!readOidcSession())return;
+      setLoaderStage('正在验证管理员权限','正在安全读取你的私密生活配置…',2);
       beginWorkspaceSync();
       try{await loadPrivateRuntimeConfig()}catch(error){
         $('#ha-status').textContent='管理员权限未解锁';
         $('#environment').textContent='已登录 · Home Assistant 私密配置受保护';
         notice(error.message);
+        finishDashboardLoad();
         return;
       }
-      sync(HA).then(()=>beginAutoSync(HA)).catch(()=>notice('Home Assistant 连接失败，请检查 .env 与 CORS 设置'))
-    }).catch(e=>{setLoginReady(false);loginError(e.message);$('#app-loader').classList.add('hidden')});
+      setLoaderStage('正在连接生活中枢','正在同步家庭环境、设备与今日安排…',3);
+      try{await sync(HA);beginAutoSync(HA);finishDashboardLoad()}catch(error){finishDashboardLoad();notice('Home Assistant 连接失败，请检查 .env 与 CORS 设置')}
+    }).catch(e=>{setLoginReady(false);loginError(e.message);finishDashboardLoad()});
     document.querySelectorAll('.quick-grid button').forEach(b=>b.addEventListener('click',()=>{if(readOidcSession())return;b.classList.toggle('on');b.querySelector('small').textContent=b.classList.contains('on')?'已开启':'已关闭'}));
     /* ===== 外观主题：日间 / 夜间 / 跟随系统 ===== */
     const themeKey='life-hub-theme',themeMedia=matchMedia('(prefers-color-scheme: dark)');
