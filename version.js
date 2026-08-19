@@ -1,4 +1,4 @@
 window.LIFE_HUB_RELEASE = Object.freeze({
-  version: '0.9.1',
+  version: '0.10.0',
   releasedAt: '2026-08-19'
 });

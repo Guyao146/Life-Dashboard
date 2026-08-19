@@ -64,7 +64,7 @@
 
 ## 💻 DSH 工作区动态
 
-本地 `dsh-activity-tracker 1.5.0+` 每 10 秒主动通过 HTTPS 向远端生活看板推送工作区快照，因此本地 DSH 在 NAT 后也无需开放端口。卡片会显示工作中、活跃、最近活动、空闲，以及本地数据源在线/离线；已授权工作区可查看会话记录并向当前运行中的 DSH 会话发送后续消息。
+本地 `dsh-activity-tracker 1.6.0+` 每 10 秒主动通过 HTTPS 向远端生活看板推送工作区快照，因此本地 DSH 在 NAT 后也无需开放端口。卡片会显示工作中、活跃、最近活动、空闲，以及本地数据源在线/离线；已授权工作区可查看会话记录并向当前运行中的 DSH 会话发送后续消息。
 
 ### 远端服务器配置
 
@@ -76,19 +76,14 @@ LIFE_HUB_DSH_OFFLINE_AFTER_SECONDS="45"
 LIFE_HUB_OIDC_REMEMBER_DAYS="30"
 ```
 
-### 本地 DSH 配置
+### 本地 DSH 配对（无需手写文件）
 
-创建 `~/.dsh/dsh-activity-tracker-dashboard.json`：
+1. 以 Authentik 管理员身份打开 **设置 → 连接与账户 → 连接本机 DSH**；
+2. 点击「生成 DSH 配对码」；
+3. 在本机 DSH 打开 **📊 活动统计 → 总设置 → 生活看板连接**，输入显示的 6 位验证码；
+4. 可选勾选「允许查看会话详情」，然后点击「输入验证码并连接」。
 
-```json
-{
-  "token": "与远端 LIFE_HUB_DSH_PUSH_SECRET 完全相同",
-  "pushUrl": "https://life.mcylyr.cn/config.php?action=workspace-push",
-  "intervalSeconds": 10
-}
-```
-
-重启本地 DSH。推送采用 HMAC-SHA256、120 秒时间窗口和重放防护，远端缓存写入系统临时目录；浏览器仍需 Authentik 管理员身份才能读取。
+验证码有效期为 5 分钟，仅能成功使用一次，最多允许 5 次尝试。配对完成后插件自动在本机保存连接信息，页面不会显示或要求复制 HMAC 密钥。推送仍采用 HMAC-SHA256、120 秒时间窗口和重放防护，远端缓存写入系统临时目录；浏览器仍需 Authentik 管理员身份才能读取。
 
 ### 远端会话消息
 

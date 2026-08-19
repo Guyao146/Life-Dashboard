@@ -206,6 +206,86 @@ function workspaceCommandPath(): string
     return workspaceCachePath() . '.commands';
 }
 
+function workspacePairingPath(): string
+{
+    return workspaceCachePath() . '.pairing';
+}
+
+function workspacePairingLockPath(): string
+{
+    return workspacePairingPath() . '.lock';
+}
+
+function writePrivateJson(string $path, array $payload, string $error): void
+{
+    $temporary = $path . '.' . bin2hex(random_bytes(6)) . '.tmp';
+    if (@file_put_contents($temporary, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX) === false || !@rename($temporary, $path)) {
+        @unlink($temporary);
+        configRespond(500, ['ok' => false, 'error' => $error]);
+    }
+    @chmod($path, 0600);
+}
+
+function workspacePairingSecret(array $values): string
+{
+    $secret = requiredEnv($values, 'LIFE_HUB_DSH_PUSH_SECRET');
+    if (strlen($secret) < 32) configRespond(503, ['ok' => false, 'error' => 'LIFE_HUB_DSH_PUSH_SECRET 至少需要 32 个字符']);
+    return $secret;
+}
+
+function createWorkspacePairing(array $values): never
+{
+    workspacePairingSecret($values);
+    $lock = @fopen(workspacePairingLockPath(), 'c');
+    if ($lock === false || !flock($lock, LOCK_EX)) configRespond(500, ['ok' => false, 'error' => '服务器无法创建 DSH 配对锁']);
+    try {
+        $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $expiresAt = time() + 300;
+        writePrivateJson(workspacePairingPath(), [
+            'codeHash' => password_hash($code, PASSWORD_DEFAULT),
+            'expiresAt' => $expiresAt,
+            'attempts' => 0,
+            'createdAt' => time(),
+        ], '服务器无法保存 DSH 配对验证码');
+        configRespond(201, ['ok' => true, 'code' => $code, 'expiresAt' => $expiresAt, 'attemptsRemaining' => 5]);
+    } finally {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+    }
+}
+
+function consumeWorkspacePairing(array $values): never
+{
+    $body = (string) file_get_contents('php://input');
+    if ($body === '' || strlen($body) > 1024) configRespond(413, ['ok' => false, 'error' => '配对请求无效']);
+    $input = json_decode($body, true);
+    $code = is_array($input) ? (string) ($input['code'] ?? '') : '';
+    if (preg_match('/^\d{6}$/', $code) !== 1) configRespond(400, ['ok' => false, 'error' => '请输入 6 位验证码']);
+    $secret = workspacePairingSecret($values);
+    $path = workspacePairingPath();
+    $lock = @fopen(workspacePairingLockPath(), 'c');
+    if ($lock === false || !flock($lock, LOCK_EX)) configRespond(500, ['ok' => false, 'error' => '服务器无法读取 DSH 配对状态']);
+    try {
+        $record = json_decode((string) @file_get_contents($path), true);
+        $expired = !is_array($record) || (int) ($record['expiresAt'] ?? 0) <= time() || (int) ($record['attempts'] ?? 0) >= 5;
+        if ($expired) {
+            @unlink($path);
+            configRespond(401, ['ok' => false, 'error' => '验证码无效或已过期，请在生活看板重新生成']);
+        }
+        if (!is_string($record['codeHash'] ?? null) || !password_verify($code, $record['codeHash'])) {
+            $record['attempts'] = (int) ($record['attempts'] ?? 0) + 1;
+            if ($record['attempts'] >= 5) @unlink($path);
+            else writePrivateJson($path, $record, '服务器无法更新 DSH 配对状态');
+            configRespond(401, ['ok' => false, 'error' => '验证码无效或已过期，请在生活看板重新生成']);
+        }
+        @unlink($path); // 先消费再响应，避免并发请求复用同一验证码。
+        configRespond(200, ['ok' => true, 'token' => $secret, 'intervalSeconds' => 10, 'pairedAt' => time()]);
+    } finally {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+    }
+}
+
 function workspaceCommands(): array
 {
     $commands = json_decode((string) @file_get_contents(workspaceCommandPath()), true);
@@ -216,11 +296,7 @@ function workspaceCommands(): array
 function saveWorkspaceCommands(array $commands): void
 {
     $path = workspaceCommandPath();
-    $temporary = $path . '.' . bin2hex(random_bytes(6)) . '.tmp';
-    if (@file_put_contents($temporary, json_encode(array_slice($commands, -200), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX) === false || !@rename($temporary, $path)) {
-        @unlink($temporary); configRespond(500, ['ok' => false, 'error' => '服务器无法保存消息队列']);
-    }
-    @chmod($path, 0600);
+    writePrivateJson($path, array_slice($commands, -200), '服务器无法保存消息队列');
 }
 
 function validateWorkspacePayload(array $payload): array
@@ -298,8 +374,7 @@ function validateWorkspacePayload(array $payload): array
 
 function receiveWorkspacePush(array $values): never
 {
-    $secret = requiredEnv($values, 'LIFE_HUB_DSH_PUSH_SECRET');
-    if (strlen($secret) < 32) configRespond(503, ['ok' => false, 'error' => 'LIFE_HUB_DSH_PUSH_SECRET 至少需要 32 个字符']);
+    $secret = workspacePairingSecret($values);
     $timestamp = (string) ($_SERVER['HTTP_X_DSH_PUSH_TIMESTAMP'] ?? '');
     $signature = strtolower((string) ($_SERVER['HTTP_X_DSH_PUSH_SIGNATURE'] ?? ''));
     if (preg_match('/^\d{10}$/', $timestamp) !== 1 || preg_match('/^[a-f0-9]{64}$/', $signature) !== 1) {
@@ -352,7 +427,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && strtolower(trim((string) ($_GET['ac
     $values = loadEnvFile();
     receiveWorkspacePush($values);
 }
-if ($_SERVER['REQUEST_METHOD'] !== 'GET' && !(strtolower(trim((string) ($_GET['action'] ?? ''))) === 'workspace-command' && $_SERVER['REQUEST_METHOD'] === 'POST')) {
+$requestedAction = strtolower(trim((string) ($_GET['action'] ?? '')));
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $requestedAction === 'workspace-pair-consume') {
+    // DSH 宿主机的 Node 请求不会携带 Origin；拒绝所有浏览器请求，避免跨站页面消耗用户正在输入的验证码。
+    if (trim((string) ($_SERVER['HTTP_ORIGIN'] ?? '')) !== '') configRespond(403, ['ok' => false, 'error' => '配对验证码只能由 DSH 本地插件提交']);
+    consumeWorkspacePairing(loadEnvFile());
+}
+if ($_SERVER['REQUEST_METHOD'] !== 'GET' && !in_array($requestedAction, ['workspace-command', 'workspace-pair-create'], true)) {
     configRespond(405, ['ok' => false, 'error' => '配置接口只接受 GET 请求']);
 }
 if (!requestIsSameOrigin()) {
@@ -387,8 +468,8 @@ if ($action === 'public') {
     configRespond(200, $payload);
 }
 
-if (!in_array($action, ['private', 'identity', 'workspaces', 'workspace-command'], true)) {
-    configRespond(400, ['ok' => false, 'error' => 'action 必须为 public、identity、private 或 workspaces']);
+if (!in_array($action, ['private', 'identity', 'workspaces', 'workspace-command', 'workspace-pair-create'], true)) {
+    configRespond(400, ['ok' => false, 'error' => 'action 必须为 public、identity、private、workspaces 或 workspace-pair-create']);
 }
 
 $claims = fetchUserInfo(requiredEnv($values, 'LIFE_HUB_OIDC_USERINFO_URL'), bearerToken());
@@ -405,6 +486,11 @@ if (!$authorization['administrator']) {
         ? '服务器未配置 LIFE_HUB_ADMIN_GROUPS'
         : '当前 Authentik 账号不在允许的管理员组中';
     configRespond(403, ['ok' => false, 'error' => $error, 'identity' => $identity, 'authorization' => $authorization]);
+}
+
+if ($action === 'workspace-pair-create') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') configRespond(405, ['ok' => false, 'error' => '配对验证码接口只接受 POST 请求']);
+    createWorkspacePairing($values);
 }
 
 if ($action === 'workspace-command') {
