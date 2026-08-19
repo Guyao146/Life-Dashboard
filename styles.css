@@ -2008,8 +2008,9 @@ main {
 /* ===== AI 助手 ===== */
 .nav-ai-button { color:var(--muted) }
 .nav-ai-button .icon { color:var(--accent) }
-.ai-panel { position:fixed; right:18px; bottom:18px; width:min(380px,calc(100vw - 36px)); height:min(560px,calc(100vh - 120px)); background:var(--card); border:1px solid var(--line); border-radius:18px; box-shadow:0 24px 70px rgba(20,32,28,.25); display:flex; flex-direction:column; z-index:90; opacity:0; transform:translateY(14px) scale(.98); pointer-events:none; transition:opacity .22s,transform .22s }
-.ai-panel.open { opacity:1; transform:none; pointer-events:auto }
+.ai-launcher{position:fixed;right:20px;bottom:20px;z-index:91;width:50px;height:50px;border-radius:16px;background:var(--accent);color:#fff;font-size:24px;box-shadow:0 12px 30px rgba(21,126,108,.3);transition:transform .2s,opacity .2s}.ai-launcher:hover{transform:translateY(-3px)}.ai-launcher.is-hidden{opacity:0;pointer-events:none;transform:scale(.7)}
+.ai-panel { position:fixed; right:18px; bottom:18px; width:clamp(320px,30vw,520px); height:clamp(360px,62vh,720px); min-width:300px; min-height:300px; max-width:calc(100vw - 28px); max-height:calc(100vh - 28px); resize:both; overflow:hidden; background:var(--card); border:1px solid var(--line); border-radius:18px; box-shadow:0 24px 70px rgba(20,32,28,.25); display:flex; flex-direction:column; z-index:90; opacity:0; transform:translateY(14px) scale(.98); pointer-events:none; transition:opacity .22s,transform .22s }
+.ai-panel.open { opacity:1; transform:none; pointer-events:auto }.ai-panel.minimized{opacity:0;pointer-events:none;transform:translateY(14px) scale(.96)}.ai-head-actions{display:flex;gap:4px}.ai-head-actions .more{width:28px;height:28px;display:grid;place-items:center}
 .ai-head { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--line) }
 .ai-title { display:flex; align-items:center; gap:8px; font-size:14px }
 .ai-title small { color:var(--muted); font-size:11px; font-family:'DM Mono',monospace; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
