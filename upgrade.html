@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#101516">
+  <title>升级控制台 · 生活中枢</title>
+  <script>try{const mode=localStorage.getItem('life-hub-theme')||'auto';document.documentElement.dataset.theme=mode==='dark'||(mode==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light'}catch(e){}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="upgrade-body">
+  <main class="upgrade-shell">
+    <header class="upgrade-head"><a class="upgrade-brand" href="index.html"><span class="logo"></span><span>生活中枢</span></a><a class="btn" href="index.html">返回看板</a></header>
+    <section class="upgrade-card">
+      <div class="upgrade-title"><div><span class="eyebrow">ADMINISTRATOR CONSOLE</span><h1>升级控制台</h1><p>通过已登录的 Authentik 管理员身份安全拉取固定分支，并实时显示服务器端升级进度。</p></div><span class="upgrade-state" id="upgrade-state">正在验证</span></div>
+      <div class="upgrade-versions"><div><small>当前版本</small><b id="local-version">读取中</b></div><span>→</span><div><small>远端版本</small><b id="remote-version">尚未检查</b></div></div>
+      <div class="upgrade-progress" aria-live="polite"><div class="upgrade-progress-meta"><b id="progress-stage">等待检查</b><span id="progress-percent">0%</span></div><div class="upgrade-progress-track"><i id="progress-bar"></i></div><p id="progress-message">将验证管理员身份，然后检查远端版本。</p></div>
+      <ol class="upgrade-steps" id="upgrade-steps"><li data-stage="source"><i>1</i><span><b>同步源码</b><small>拉取配置的远端分支</small></span></li><li data-stage="verify"><i>2</i><span><b>校验版本</b><small>读取远端发布版本</small></span></li><li data-stage="deploy"><i>3</i><span><b>部署文件</b><small>原子替换站点文件并保留 .env</small></span></li><li data-stage="cleanup"><i>4</i><span><b>清理完成</b><small>移除旧浏览器配置和开发产物</small></span></li></ol>
+      <div class="upgrade-actions"><button class="btn" id="check-upgrade" type="button">检查更新</button><button class="btn primary" id="start-upgrade" type="button" disabled>开始升级</button></div>
+      <pre class="upgrade-log" id="upgrade-log" aria-live="polite">等待管理员身份验证…</pre>
+      <p class="upgrade-note" id="upgrade-note">此页面不保存访问令牌；真正的升级、进度和日志接口都会在服务器端重新验证 Authentik 管理员权限。</p>
+    </section>
+  </main>
+  <script src="version.js"></script>
+  <script>
+  (()=>{
+    const $=selector=>document.querySelector(selector),sessionKey='life-hub-oidc',release=window.LIFE_HUB_RELEASE||{},state={running:false,remoteVersion:''};
+    const setText=(id,value)=>$(id).textContent=value;
+    const log=(message,kind='')=>{const box=$('#upgrade-log'),time=new Date().toLocaleTimeString('zh-CN',{hour12:false});box.textContent+=`\n[${time}] ${message}`;box.scrollTop=box.scrollHeight;if(kind)box.dataset.kind=kind};
+    const storedSession=()=>{try{return JSON.parse(localStorage.getItem(sessionKey)||'null')}catch(error){return null}};
+    const accessToken=()=>{const session=storedSession();return session?.access_token&&Number(session.expiresAt)>Date.now()+15000?session.access_token:''};
+    const setState=(label,kind='')=>{setText('#upgrade-state',label);$('#upgrade-state').dataset.kind=kind};
+    const setProgress=(stage,message,current=0,total=0)=>{const percent=total?Math.min(100,Math.round(current/total*100)):({source:12,verify:28,deploy:45,cleanup:92,done:100,error:100}[stage]||0);setText('#progress-stage',({source:'同步源码',verify:'校验版本',deploy:'部署文件',cleanup:'清理产物',done:'升级完成',error:'升级失败'}[stage]||'等待检查'));setText('#progress-percent',`${percent}%`);$('#progress-bar').style.width=`${percent}%`;setText('#progress-message',message||'');document.querySelectorAll('#upgrade-steps li').forEach(item=>{const order=['source','verify','deploy','cleanup'],index=order.indexOf(item.dataset.stage),currentIndex=order.indexOf(stage);item.classList.toggle('done',currentIndex>index||stage==='done');item.classList.toggle('active',currentIndex===index&&stage!=='done')})};
+    const parseJson=async response=>{const data=await response.json().catch(()=>null);if(!response.ok||!data?.ok)throw new Error(data?.error||`HTTP ${response.status}`);return data};
+    async function check(){if(state.running)return;const button=$('#check-upgrade');button.disabled=true;setState('检查中','working');setProgress('', '正在读取远端版本…');try{const data=await parseJson(await fetch('update.php',{method:'POST',headers:{'X-Life-Hub-Update-Command':'check','Content-Type':'application/json'},body:'{}',cache:'no-store'}));state.remoteVersion=data.remoteVersion||'';setText('#remote-version',state.remoteVersion?`v${state.remoteVersion}`:'未找到');const current=String(release.version||'');const different=state.remoteVersion&&state.remoteVersion!==current;$('#start-upgrade').disabled=!different||!accessToken();setState(different?'可升级':'已是最新','ready');setProgress(different?'source':'done',different?`发现 v${state.remoteVersion}，可以开始升级。`:'当前已部署最新版本。',different?0:1,different?0:1);log(different?`远端版本 v${state.remoteVersion} 已就绪。`:'远端版本与当前版本一致。')}catch(error){setState('检查失败','error');setProgress('error',error.message);log(`检查失败：${error.message}`,'error')}finally{button.disabled=false}}
+    function receiveEvent(payload){if(!payload)return;const stage=payload.stage||'',message=payload.message||'',progress=payload.progress||{};setProgress(stage,message,Number(progress.current)||0,Number(progress.total)||0);if(message)log(message);if(payload.remoteVersion){state.remoteVersion=payload.remoteVersion;setText('#remote-version',`v${payload.remoteVersion}`)}if(payload.state==='success'){state.running=false;setState('升级完成','success');$('#start-upgrade').disabled=false;$('#start-upgrade').textContent='升级完成，刷新看板';$('#start-upgrade').onclick=()=>location.assign('index.html?updated='+Date.now());$('#upgrade-note').textContent='服务器已完成部署。刷新看板后即可加载新版本。'}if(payload.state==='error'){state.running=false;setState('升级失败','error');$('#start-upgrade').disabled=false;$('#start-upgrade').textContent='重试升级'}}
+    async function start(){if(state.running)return;const token=accessToken();if(!token){setState('需要管理员登录','error');setProgress('error','请先从看板使用 Authentik 管理员账号登录，再返回此页面。');log('没有有效的 Authentik 管理员会话。','error');return}state.running=true;$('#start-upgrade').disabled=true;$('#start-upgrade').textContent='正在升级…';$('#upgrade-log').textContent='';setState('正在升级','working');setProgress('source','已向服务器提交升级任务…');try{const response=await fetch('update.php',{method:'POST',headers:{'X-Life-Hub-Update-Command':'update-stream','Authorization':'Bearer '+token,'Content-Type':'application/json','Accept':'text/event-stream'},body:'{}',cache:'no-store'});if(!response.ok){throw new Error((await response.json().catch(()=>({}))).error||`HTTP ${response.status}`)}if(!response.body)throw new Error('当前浏览器不支持流式升级响应');const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='';while(true){const {value,done}=await reader.read();buffer+=decoder.decode(value||new Uint8Array(),{stream:!done});let split;while((split=buffer.indexOf('\n\n'))>=0){const packet=buffer.slice(0,split);buffer=buffer.slice(split+2);const row=packet.split('\n').find(line=>line.startsWith('data:'));if(row){try{receiveEvent(JSON.parse(row.slice(5).trim()))}catch(error){console.warn('无法解析升级事件',error)}}}if(done)break}if(state.running)throw new Error('升级连接已关闭，未收到完成状态')}catch(error){state.running=false;setState('升级失败','error');setProgress('error',error.message);log(`升级失败：${error.message}`,'error');$('#start-upgrade').disabled=false;$('#start-upgrade').textContent='重试升级'}}
+    $('#check-upgrade').onclick=check;$('#start-upgrade').onclick=start;setText('#local-version',release.version?`v${release.version}`:'版本信息缺失');if(!accessToken()){setState('需要管理员登录','error');setText('#progress-message','请先在看板中完成 Authentik 管理员登录。');$('#upgrade-log').textContent='未检测到有效的管理员会话。\n请返回看板，使用 Authentik 管理员账号登录后再打开此页面。'}else{setState('已验证会话','ready');$('#upgrade-log').textContent='已检测到 Authentik 会话，正在检查远端版本…';check()}
+  })();
+  </script>
+</body>
+</html>

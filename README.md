@@ -15,7 +15,7 @@
 
 **Life Dashboard（生活看板）** 是一个面向个人用户打造的全栈数字生活管理平台
 
-通过 HomeAssistant + 米家集成 + Microsoft To Do 将日常生活中的各种信息进行整合
+通过 HomeAssistant + 米家集成 + Microsoft To Do + DeepSeek Harness 将日常生活中的各种信息进行整合
 
 让用户可以在一个统一的可视化界面中，快速了解自己的生活状态，并实现人与环境之间更加智能、高效的连接
 
@@ -313,9 +313,9 @@ JSON.stringify({ salt: e(s), hash: e(new Uint8Array(b)), iterations: 310000 });
 
 3. 确保服务器已经配置 GitHub 仓库的读取凭证（公开仓库可直接使用 HTTPS，私有仓库建议使用只读 Deploy Key）；
 4. 确保 PHP 用户可写 PHP 系统临时目录；执行升级时还需能写站点目录，并允许 PHP 使用 `proc_open` 执行 `git`；
-5. 在设置 → 版本与更新中点击“检查更新”。检测到远端版本更高时，点击“升级到 vX.Y.Z”，PHP 会刷新临时浅克隆并部署文件。服务器本地的 `.env` 和 `.git` 不会被覆盖；遗留 `config.js` 会被删除。
+5. 在设置 → 版本与更新中点击“检查更新”。检测到远端版本更高时，可点击“升级到 vX.Y.Z”或进入“升级控制台”；控制台会实时展示源码同步、版本校验、逐文件原子部署和清理阶段的服务器日志。服务器本地的 `.env` 和 `.git` 不会被覆盖；遗留 `config.js` 会被删除。
 
-`update.php` 只接受同源 POST，并要求当前浏览器携带有效的 Authentik 管理员会话；普通 Authentik 用户、本地账号、未登录用户和跨站请求都不能触发升级。它只允许拉取 `LIFE_HUB_UPDATE_BRANCH` 指定的分支（默认 `main`），同时使用文件锁防止并发升级。
+`update.php` 只接受同源 POST，并要求当前浏览器携带有效的 Authentik 管理员会话；普通 Authentik 用户、本地账号、未登录用户和跨站请求都不能触发升级。它只允许拉取 `LIFE_HUB_UPDATE_BRANCH` 指定的分支（默认 `main`），同时使用文件锁防止并发升级。升级控制台使用同一接口的 `update-stream` 指令接收 SSE 进度，但每次升级请求都会在服务器端重新验证管理员身份；访问令牌不会写入升级日志或磁盘。
 
 ### 从旧 `config.js` 迁移
 
