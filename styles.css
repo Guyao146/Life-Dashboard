@@ -2347,6 +2347,7 @@ main {
 .workspace-detail-modal-box .workspace-detail-layout,.workspace-detail-modal-box .workspace-record-panel,.workspace-detail-modal-box .workspace-record-list{min-width:0}
 .workspace-detail-modal-box .workspace-record-list{overflow-x:hidden}
 @container workspace-detail (max-width:760px){.workspace-detail-layout:not(.is-locked){display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:minmax(110px,28%) minmax(0,1fr)!important;gap:12px!important}.workspace-session-list{border-right:0!important;border-bottom:1px solid var(--line);padding:0 0 10px!important}.workspace-record{max-width:100%;margin-left:0!important;margin-right:0!important}.workspace-record header{align-items:flex-start;flex-wrap:wrap}.workspace-record header time{font-size:10px}.workspace-record pre{font-size:13px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word}.workspace-message-form{gap:8px}.workspace-message-form textarea{min-height:58px;font-size:13px}.workspace-message-form button{padding:9px 12px}}
+.modal-box.workspace-detail-modal-box{width:min(1120px,calc(100vw - 24px))!important;max-width:none!important;height:min(780px,calc(100dvh - 24px));padding:clamp(16px,3vw,24px)}
 
 /* v1 升级控制台：独立于主看板的三列 main 网格，避免超宽屏时被压成细长卡片。 */
 .upgrade-body { min-height:100vh; background:radial-gradient(circle at 50% -20%,#1a4135 0,#0c1511 44%,#080c0a 100%) !important }
