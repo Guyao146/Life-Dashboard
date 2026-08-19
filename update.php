@@ -253,6 +253,22 @@ function remoteVersionFromCheckout(string $checkout): string
     return parseReleaseVersion($source);
 }
 
+function deployedVersion(string $repository): string
+{
+    $source = @file_get_contents($repository . DIRECTORY_SEPARATOR . 'version.js');
+    if ($source === false) {
+        throw new RuntimeException('当前站点缺少 version.js，拒绝执行不可验证的升级');
+    }
+    return parseReleaseVersion($source);
+}
+
+function assertRemoteIsNewer(string $remoteVersion, string $currentVersion): void
+{
+    if (version_compare($remoteVersion, $currentVersion, '<=')) {
+        throw new RuntimeException("远端 v{$remoteVersion} 未高于当前 v{$currentVersion}，已拒绝重复升级或降级部署");
+    }
+}
+
 function deployCheckout(string $source, string $target, string $relative = '', ?callable $onFile = null): int
 {
     $count = 0;
@@ -487,13 +503,17 @@ try {
         if ($command === 'update-stream') {
             sendUpdateEvent('running', 'verify', '源码同步完成，正在校验远端发布版本…', [], ['commit' => $commit !== '' ? $commit : null]);
             $remoteVersion = remoteVersionFromCheckout($checkout);
+            $currentVersion = deployedVersion($repository);
+            assertRemoteIsNewer($remoteVersion, $currentVersion);
             $totalFiles = deploymentFileCount($checkout);
-            sendUpdateEvent('running', 'deploy', "远端 v{$remoteVersion} 已校验，开始原子部署 {$totalFiles} 个文件…", ['current' => 0, 'total' => $totalFiles], ['remoteVersion' => $remoteVersion]);
+            sendUpdateEvent('running', 'deploy', "当前 v{$currentVersion} → 远端 v{$remoteVersion}，开始原子部署 {$totalFiles} 个文件…", ['current' => 0, 'total' => $totalFiles], ['remoteVersion' => $remoteVersion]);
             $files = deployCheckout($checkout, $repository, '', static function (string $path, int $current) use ($totalFiles): void {
                 sendUpdateEvent('running', 'deploy', "已部署 {$path}", ['current' => $current, 'total' => $totalFiles]);
             });
             sendUpdateEvent('running', 'cleanup', '正在清理旧浏览器配置和开发产物…', ['current' => $files, 'total' => $totalFiles]);
         } else {
+            $remoteVersion = remoteVersionFromCheckout($checkout);
+            assertRemoteIsNewer($remoteVersion, deployedVersion($repository));
             $files = deployCheckout($checkout, $repository);
         }
         removeLegacyPublicArtifacts($repository);
