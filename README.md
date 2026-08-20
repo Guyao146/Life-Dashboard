@@ -1,16 +1,17 @@
 <p align="center"><img src="https://raw.githubusercontent.com/Guyao146/Sakura-EcoSystem-wiki/main/assets/life.svg" width="180"></p>
+
 # Life Dashboard —— 智能生活看板
 
 [![樱落生态成员](https://raw.githubusercontent.com/Guyao146/Sakura-EcoSystem-wiki/main/assets/ConnectEcoSystem.svg)](https://mcylyr.cn)
 
-<p align="center">
+<p align="lift">
   <b>一个连接现实生活与数字世界的个人生活中枢</b>
 </p>
 
-<p align="center">
+<p align="lift">
   📊 数据可视化 · 🏠 智能家居控制 · ⏰ 日程管理
 </p>
-<p align="center">
+<p align="lift">
   📝 生活记录 · 🤖 HomeAssistant联动 · 🔒 Authentik统一认证
 </p>
 
