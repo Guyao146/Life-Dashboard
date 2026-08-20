@@ -1,4 +1,4 @@
-![LOGO](https://raw.githubusercontent.com/Guyao146/Sakura-EcoSystem-wiki/main/assets/life.svg)
+<p align="center"><img src="https://raw.githubusercontent.com/Guyao146/Sakura-EcoSystem-wiki/main/assets/life.svg" width="180"></p>
 # Life Dashboard —— 智能生活看板
 
 [![樱落生态成员](https://raw.githubusercontent.com/Guyao146/Sakura-EcoSystem-wiki/main/assets/ConnectEcoSystem.svg)](https://mcylyr.cn)
