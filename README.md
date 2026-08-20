@@ -1,4 +1,7 @@
-# 🌌 Life Dashboard —— 智能生活看板
+![LOGO](https://raw.githubusercontent.com/Guyao146/Sakura-EcoSystem-wiki/main/assets/life.svg)
+# Life Dashboard —— 智能生活看板
+
+[![樱落生态成员](https://raw.githubusercontent.com/Guyao146/Sakura-EcoSystem-wiki/main/assets/ConnectEcoSystem.svg)](https://mcylyr.cn)
 
 <p align="center">
   <b>一个连接现实生活与数字世界的个人生活中枢</b>
