@@ -1,4 +1,4 @@
-<p align="lift"><img src="https://raw.githubusercontent.com/Guyao146/Sakura-EcoSystem-wiki/main/assets/life.svg" width="100"><h1>Life Dashboard —— 智能生活看板</h1></p>
+<p align="lift"><img src="https://raw.githubusercontent.com/Guyao146/Sakura-EcoSystem-wiki/main/assets/life.svg" width="100"></p>
 
 # Life Dashboard —— 智能生活看板
 
