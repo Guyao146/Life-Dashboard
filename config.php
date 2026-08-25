@@ -334,6 +334,8 @@ function validateWorkspacePayload(array $payload): array
                     'title' => function_exists('mb_substr') ? mb_substr((string) ($detailSession['title'] ?? ''), 0, 240) : substr((string) ($detailSession['title'] ?? ''), 0, 240),
                     'createdAt' => max(0, (int) ($detailSession['createdAt'] ?? 0)),
                     'turns' => max(0, (int) ($detailSession['turns'] ?? 0)),
+                    'lastAt' => max(0, (int) ($detailSession['lastAt'] ?? 0)),
+                    'state' => in_array($detailSession['state'] ?? '', ['completed', 'error', 'choice', 'task', 'sleep'], true) ? $detailSession['state'] : 'sleep',
                     'records' => $records,
                 ];
             }
@@ -346,19 +348,20 @@ function validateWorkspacePayload(array $payload): array
             'activeEvents' => max(0, (int) ($item['activeEvents'] ?? 0)),
             'todayEvents' => max(0, (int) ($item['todayEvents'] ?? 0)),
             'todayTokens' => max(0, (int) ($item['todayTokens'] ?? 0)),
-            'state' => in_array($item['state'] ?? '', ['working', 'active', 'recent', 'idle', 'none'], true) ? $item['state'] : 'none',
+            'state' => in_array($item['state'] ?? '', ['completed', 'error', 'choice', 'task', 'sleep'], true) ? $item['state'] : 'sleep',
             'ageMs' => isset($item['ageMs']) ? max(0, (int) $item['ageMs']) : null,
             'latestSession' => $session === [] ? null : [
                 'id' => preg_match('/^[a-z0-9-]{1,16}$/i', (string) ($session['id'] ?? '')) === 1 ? (string) $session['id'] : '',
                 'turns' => max(0, (int) ($session['turns'] ?? 0)),
                 'lastAt' => max(0, (int) ($session['lastAt'] ?? 0)),
+                'state' => in_array($session['state'] ?? '', ['completed', 'error', 'choice', 'task', 'sleep'], true) ? $session['state'] : 'sleep',
             ],
             'detailAuthorized' => $detailAuthorized,
             'detailSessions' => $detailSessions,
         ];
     }
     $summary = [];
-    foreach (['total', 'working', 'active', 'recent', 'idle', 'none'] as $key) $summary[$key] = max(0, (int) ($payload['summary'][$key] ?? 0));
+    foreach (['total', 'completed', 'error', 'choice', 'task', 'sleep'] as $key) $summary[$key] = max(0, (int) ($payload['summary'][$key] ?? 0));
     $commandAcks = [];
     if (is_array($payload['commandAcks'] ?? null)) foreach (array_slice($payload['commandAcks'], -200) as $id) if (preg_match('/^[a-f0-9-]{36}$/i', (string) $id) === 1) $commandAcks[] = (string) $id;
     return [
@@ -412,7 +415,7 @@ function cachedDshWorkspaces(array $values): array
 {
     $record = json_decode((string) @file_get_contents(workspaceCachePath()), true);
     if (!is_array($record) || !is_array($record['payload'] ?? null)) {
-        return ['ok' => true, 'generatedAt' => 0, 'summary' => ['total' => 0, 'working' => 0, 'active' => 0, 'recent' => 0, 'idle' => 0, 'none' => 0], 'workspaces' => [], 'source' => ['online' => false, 'receivedAt' => 0, 'ageMs' => null]];
+        return ['ok' => true, 'generatedAt' => 0, 'summary' => ['total' => 0, 'completed' => 0, 'error' => 0, 'choice' => 0, 'task' => 0, 'sleep' => 0], 'workspaces' => [], 'source' => ['online' => false, 'receivedAt' => 0, 'ageMs' => null]];
     }
     $receivedAt = (int) ($record['receivedAt'] ?? 0);
     $ageMs = max(0, (int) round(microtime(true) * 1000) - $receivedAt);
