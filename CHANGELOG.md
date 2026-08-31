@@ -6,6 +6,13 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [1.0.2] - 2026-08-31
+
+### 修复
+
+- 本地账号登录改为先校验 `.env` 中的 salt 与密码哈希是否为合法 Base64，占位值不再触发底层 `atob` 解码报错。
+- 检测到本地账号配置无效时，登录页会直接提示按 README 生成真实值，并引导先使用 Authentik 登录。
+
 ## [1.0.1] - 2026-08-31
 
 ### 修复
@@ -84,6 +91,7 @@
 - 工作区详情弹窗改为根据自身宽度响应：窄弹窗自动切换为上下布局，记录正文不再被挤成逐字换行，消息输入区保持完整可用。
 - 优化窄弹窗中的会话列表、记录卡片、时间标签和发送区尺寸，提高桌面小窗与移动端可读性。
 
+[1.0.2]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.2
 [1.0.1]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.1
 [1.0.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.0
 [0.10.7]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.10.7

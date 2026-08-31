@@ -19,8 +19,23 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       if(!config?.oidc?.token)missing.push('oidc.token');
       if(missing.length)throw new Error(`.env 公开配置缺失：${missing.join('、')}`);
       OIDC={...config.oidc};
-      const localAuth=config.localAuth;
-      LOCAL=localAuth?.username&&localAuth?.pbkdf2?.salt&&localAuth?.pbkdf2?.hash?{username:String(localAuth.username),pbkdf2:{salt:localAuth.pbkdf2.salt,hash:localAuth.pbkdf2.hash,iterations:Number(localAuth.pbkdf2.iterations)||310000}}:null;
+      LOCAL=normalizeLocalAuth(config.localAuth);
+    }
+    /* 服务器 .env 仍留着 base64-salt / base64-pbkdf2-hash 之类占位值时，
+       必须在使用前拦下来；否则 atob() 会抛出难以理解的底层解码错误。 */
+    function isBase64(value,bytes){
+      if(typeof value!=='string')return false;
+      const text=value.trim();
+      if(!/^[A-Za-z0-9+/]+={0,2}$/.test(text)||text.length%4!==0)return false;
+      try{return atob(text).length===bytes}catch(error){return false}
+    }
+    function normalizeLocalAuth(localAuth){
+      const username=String(localAuth?.username||'').trim();
+      const salt=String(localAuth?.pbkdf2?.salt||'').trim();
+      const hash=String(localAuth?.pbkdf2?.hash||'').trim();
+      if(!username||!salt||!hash)return null;
+      if(!isBase64(salt,16)||!isBase64(hash,32))return {invalid:true};
+      return {username,pbkdf2:{salt,hash,iterations:Math.max(100000,Number(localAuth.pbkdf2.iterations)||310000)}};
     }
     async function loadPrivateRuntimeConfig(){
       const session=await validOidcSession(),token=session?.access_token;
@@ -35,7 +50,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     const b64url=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replaceAll('+','-').replaceAll('/','_').replaceAll('=','');
     async function pkce(){const bytes=crypto.getRandomValues(new Uint8Array(48)),verifier=b64url(bytes),digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier));return {verifier,challenge:b64url(digest)}}
     function loginError(m){$('#auth-error').textContent=m}
-    function setLoginReady(ready){const button=$('#auth-login');button.disabled=!ready;if(ready&&$('#auth-error').textContent.includes('配置'))loginError('')}
+    function setLoginReady(ready){const button=$('#auth-login');button.disabled=!ready;if(ready&&$('#auth-error').textContent.includes('配置'))loginError('');if(ready&&LOCAL?.invalid)loginError('本地账号配置无效：服务器 .env 中的 salt 或密码哈希仍是占位值，可先使用 樱落怡然验证服务 登录')}
     async function signIn(){
       if(!OIDC)throw new Error('登录配置尚未加载完成');
       if(!window.isSecureContext)throw new Error('Authentik 登录需要 HTTPS 部署（localhost 除外）');
@@ -149,6 +164,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       const submit=$('#auth-submit'),username=$('#auth-user').value.trim(),password=$('#auth-pass').value;
       loginError('');
       if(!LOCAL){loginError('本地账号未配置：请在服务器 .env 中填写本地登录信息');return}
+      if(LOCAL.invalid){loginError('本地账号配置无效：服务器 .env 中的 salt 或密码哈希仍是占位值，请按 README 生成真实的 Base64 值');return}
       if(!window.isSecureContext){loginError('本地登录需要 HTTPS 部署（localhost 除外）');return}
       const lock=readSession(localLockKey);
       if(lock?.until>Date.now()){loginError(`尝试次数过多，请 ${Math.ceil((lock.until-Date.now())/1000)} 秒后重试`);return}
