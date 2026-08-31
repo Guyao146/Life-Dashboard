@@ -113,7 +113,25 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       return renderSsoIdentity(readLastIdentity(),'consent')
     }
     async function loadSsoIdentity(){try{const response=await oidcFetch('config.php?action=identity',{cache:'no-store'}),config=await response.json();const identity=config?.identity||null;saveLastIdentity(identity);return identity}catch(error){return null}}
-    function setLoaderStage(title='正在加载你的生活中枢',detail='正在准备安全连接…',stage=0){const loader=$('#app-loader');if(!loader)return;$('#loader-title').textContent=title;$('#loader-detail').textContent=detail;loader.dataset.stage=String(stage);loader.classList.remove('hidden');loader.setAttribute('aria-busy','true')}
+    function setLoaderStage(title='正在加载你的生活中枢',detail='正在准备安全连接…',stage=0){const loader=$('#app-loader');if(!loader)return;renderLoaderWelcome();$('#loader-title').textContent=title;$('#loader-detail').textContent=detail;loader.dataset.stage=String(stage);loader.classList.remove('hidden');loader.setAttribute('aria-busy','true')}
+    /* 加载页顶部的问候：优先用 Authentik 身份，其次本地账号，最后回退到设置里的称呼。 */
+    function loaderWelcomeName(){
+      const identity=readLastIdentity();
+      const oidcName=String(identity?.username||identity?.email||'').trim();
+      if(oidcName)return oidcName;
+      const localName=String(readSession(localSessionKey)?.username||'').trim();
+      if(localName)return localName;
+      return displayName()
+    }
+    function renderLoaderWelcome(){
+      const box=$('#loader-welcome');if(!box)return;
+      const name=loaderWelcomeName();
+      if(!name){box.hidden=true;return}
+      box.hidden=false;
+      $('#loader-avatar').textContent=name.slice(0,1).toUpperCase();
+      $('#loader-welcome-name').textContent=name;
+      box.querySelector('small').textContent=`${greetingForHour(new Date().getHours())}，欢迎回来`
+    }
     function finishDashboardLoad(){const loader=$('#app-loader');if(!loader)return;loader.setAttribute('aria-busy','false');loader.classList.add('hidden')}
     function enterDashboard(keepLoader=false){
       $('#auth-gate').classList.add('hidden');

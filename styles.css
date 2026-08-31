@@ -1010,6 +1010,59 @@ main {
 .loader-progress i:nth-child(2) { animation-delay:.15s }
 .loader-progress i:nth-child(3) { animation-delay:.3s }
 
+/* 加载页身份问候：欢迎回来 + 账号名 */
+.loader-welcome {
+  display:inline-grid;
+  grid-template-columns:34px minmax(0,1fr);
+  align-items:center;
+  gap:10px;
+  max-width:100%;
+  margin:0 auto 18px;
+  padding:8px 14px 8px 8px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:var(--card);
+  text-align:left;
+  animation:loader-welcome-in .46s cubic-bezier(.22,1,.36,1) both
+}
+
+.loader-welcome[hidden] { display:none }
+
+.loader-avatar {
+  display:grid;
+  place-items:center;
+  width:34px;
+  height:34px;
+  border-radius:50%;
+  background:var(--accent);
+  color:#fff;
+  font:600 15px 'DM Mono',monospace
+}
+
+.loader-welcome-copy {
+  display:grid;
+  gap:1px;
+  min-width:0
+}
+
+.loader-welcome-copy small {
+  color:var(--muted);
+  font-size:11px
+}
+
+.loader-welcome-copy b {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  color:var(--ink);
+  font-size:14px
+}
+
+@keyframes loader-welcome-in {
+  from { opacity:0; transform:translateY(-7px) }
+  to { opacity:1; transform:none }
+}
+
 @keyframes loader-enter {
   from { opacity:0; transform:translateY(10px) scale(.98) }
   to { opacity:1; transform:none }
@@ -2120,6 +2173,7 @@ main {
 [data-theme="dark"] .weather-day, [data-theme="dark"] .countdown-item, [data-theme="dark"] .countdown-setting-row { background:#101815 }
 [data-theme="dark"] .mobile-nav { background:rgba(21,29,25,.94) }
 [data-theme="dark"] .app-loader { background:#0e1311; color:var(--muted) }
+[data-theme="dark"] .loader-welcome { background:#18221e; border-color:#2a3731 }
 [data-theme="dark"] .hero .temp span, [data-theme="dark"] .home-title { color:var(--ink) }
 [data-theme="dark"] .detail-state { background:#101815 }
 [data-theme="dark"] .detail-attrs div { border-color:#232e28 }
@@ -2411,7 +2465,7 @@ main {
 
 .workspace-detail-modal-box .card-head>div:first-child{min-width:0;flex:1}.workspace-detail-modal-box .card-head>div:first-child h2{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.workspace-detail-modal-box .card-head>.more{width:30px;height:30px;display:grid;place-items:center;flex:none}.workspace-detail-launcher{position:fixed;right:78px;bottom:20px;z-index:91;width:50px;height:50px;display:none;border:0;border-radius:16px;background:#4c7dff;color:#fff;font-size:22px;box-shadow:0 12px 30px rgba(76,125,255,.28);cursor:pointer}.workspace-detail-launcher.show{display:grid;place-items:center}.workspace-detail-launcher:hover{transform:translateY(-3px)}
 
-@media (prefers-reduced-motion:reduce) { .spinner,.loader-progress i,.loader-box { animation:none!important } }
+@media (prefers-reduced-motion:reduce) { .spinner,.loader-progress i,.loader-box,.loader-welcome { animation:none!important } }
 
 
 /* DSH 工作区分组、会话状态与实时输出 */
