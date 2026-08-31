@@ -44,6 +44,46 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       const p=new URLSearchParams({client_id:OIDC.clientId,response_type:'code',redirect_uri:redirectUri,scope:'openid profile email offline_access',state,code_challenge:challenge,code_challenge_method:'S256'});
       location.assign(OIDC.authorize+'?'+p)
     }
+    /* ===== 静默 SSO：检测 Authentik 会话后显示“以 *** 身份登录” ===== */
+    const silentCallbackUri=location.origin+location.pathname.replace(/[^/]*$/,'')+'silent-callback.html';
+    let silentAuthPromise=null;
+    function ssoStatus(){return $('#auth-sso')}
+    function renderSsoIdentity(identity){const box=ssoStatus();if(!box)return;const name=identity?.username||identity?.email||'';if(!name){box.hidden=true;box.innerHTML='';return}box.hidden=false;box.innerHTML=`<button class="btn primary auth-sso-continue" id="auth-sso-continue" type="button"><span class="auth-sso-avatar">${escapeHtml(name.slice(0,1).toUpperCase())}</span><span class="auth-sso-copy"><small>检测到 樱落怡然验证服务 已登录</small><b>以 ${escapeHtml(name)} 的身份继续</b></span></button><button class="btn auth-sso-switch" id="auth-sso-switch" type="button">改用其他账号登录</button>`;$('#auth-sso-continue').onclick=()=>{loginError('');location.assign(redirectUri)};$('#auth-sso-switch').onclick=()=>{clearOidcSession();box.hidden=true;box.innerHTML='';loginError('已切换为手动登录，请选择登录方式')}}
+    function runSilentAuth(){
+      if(silentAuthPromise)return silentAuthPromise;
+      if(!OIDC||!window.isSecureContext)return Promise.resolve(null);
+      silentAuthPromise=(async()=>{
+        const {verifier,challenge}=await pkce(),state=b64url(crypto.getRandomValues(new Uint8Array(20)));
+        sessionStorage.setItem('life-hub-silent-pkce',JSON.stringify({verifier,state}));
+        const params=new URLSearchParams({client_id:OIDC.clientId,response_type:'code',redirect_uri:silentCallbackUri,scope:'openid profile email',state,prompt:'none',code_challenge:challenge,code_challenge_method:'S256'});
+        return await new Promise(resolve=>{
+          const frame=document.createElement('iframe');frame.style.display='none';frame.setAttribute('aria-hidden','true');frame.title='Authentik 静默登录检查';
+          let settled=false;
+          const cleanup=()=>{window.removeEventListener('message',onMessage);clearTimeout(timer);frame.remove()};
+          const finish=value=>{if(settled)return;settled=true;cleanup();resolve(value)};
+          const onMessage=event=>{
+            if(event.origin!==location.origin||event.source!==frame.contentWindow)return;
+            const data=event.data;if(!data||data.type!=='life-hub-silent-auth')return;
+            const pending=readSession('life-hub-silent-pkce');sessionStorage.removeItem('life-hub-silent-pkce');
+            if(data.error||!data.code||!pending||pending.state!==data.state){finish(null);return}
+            exchangeSilentCode(data.code,pending.verifier).then(finish).catch(()=>finish(null));
+          };
+          const timer=setTimeout(()=>finish(null),8000);
+          window.addEventListener('message',onMessage);
+          frame.src=OIDC.authorize+'?'+params;document.body.append(frame);
+        });
+      })().catch(()=>null).finally(()=>{silentAuthPromise=null});
+      return silentAuthPromise;
+    }
+    async function exchangeSilentCode(code,verifier){
+      const form=new URLSearchParams({grant_type:'authorization_code',client_id:OIDC.clientId,code,redirect_uri:silentCallbackUri,code_verifier:verifier});
+      const response=await fetch(OIDC.token,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form});
+      if(!response.ok)return null;
+      const tokens=await response.json().catch(()=>null);
+      if(!tokens?.access_token)return null;
+      saveOidcSession(tokens);
+      try{const response=await oidcFetch('config.php?action=identity',{cache:'no-store'}),config=await response.json();return config?.identity||null}catch(error){return null}
+    }
     function setLoaderStage(title='正在加载你的生活中枢',detail='正在准备安全连接…',stage=0){const loader=$('#app-loader');if(!loader)return;$('#loader-title').textContent=title;$('#loader-detail').textContent=detail;loader.dataset.stage=String(stage);loader.classList.remove('hidden');loader.setAttribute('aria-busy','true')}
     function finishDashboardLoad(){const loader=$('#app-loader');if(!loader)return;loader.setAttribute('aria-busy','false');loader.classList.add('hidden')}
     function enterDashboard(keepLoader=false){
@@ -345,7 +385,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       }catch(err){notice(err.message)}
     };
     loadRuntimeConfig().then(()=>{setLoginReady(true);return authenticate()}).then(async ok=>{
-      if(!ok)return;
+      if(!ok){runSilentAuth().then(identity=>{if(identity)renderSsoIdentity(identity)}).catch(()=>{});return}
       if(!readOidcSession())return;
       setLoaderStage('正在验证管理员权限','正在安全读取你的私密生活配置…',2);
       beginWorkspaceSync();

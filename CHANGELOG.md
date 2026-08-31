@@ -6,6 +6,18 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [1.0.0] - 2026-08-25
+
+### 新增
+
+- 登录页支持 Authentik 静默单点登录检测：检测到验证服务已有会话时显示“以 *** 的身份继续”，一键进入看板。
+- 新增静默授权回调页 `silent-callback.html`，只在隐藏 iframe 中回传授权结果，不写入任何本地存储。
+- 未检测到会话时登录页保持原有账号密码与 OAuth 登录流程，静默检查失败会安全降级。
+
+### 安全
+
+- 静默授权全程使用 PKCE 与 `state` 校验，并强制校验 `postMessage` 的来源与发送窗口，8 秒超时兜底。
+
 ## [0.10.7] - 2026-08-21
 
 ### 新增
@@ -64,6 +76,8 @@
 - 工作区详情弹窗改为根据自身宽度响应：窄弹窗自动切换为上下布局，记录正文不再被挤成逐字换行，消息输入区保持完整可用。
 - 优化窄弹窗中的会话列表、记录卡片、时间标签和发送区尺寸，提高桌面小窗与移动端可读性。
 
+[1.0.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.0
+[0.10.7]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.10.7
 [0.10.6]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.10.6
 [0.10.5]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.10.5
 [0.10.0] - 2026-08-19

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>正在检查登录状态</title>
+</head>
+<body>
+  <script>
+    /*
+     * Authentik 静默授权回调页（prompt=none）。
+     * 只在生活看板的隐藏 iframe 中运行：把授权结果通过 postMessage 交给同源父页面，
+     * 自身不换取令牌、不写任何存储，避免登录页出现顶层跳转闪烁。
+     */
+    (function () {
+      if (!window.parent || window.parent === window) return;
+      var params = new URLSearchParams(location.search);
+      window.parent.postMessage({
+        type: 'life-hub-silent-auth',
+        code: params.get('code') || '',
+        state: params.get('state') || '',
+        error: params.get('error') || '',
+        errorDescription: params.get('error_description') || ''
+      }, location.origin);
+    })();
+  </script>
+</body>
+</html>
