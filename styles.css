@@ -982,65 +982,53 @@ main {
   font-size:12px
 }
 
-.spinner {
-  width:34px;
-  height:34px;
-  border:3px solid #cce5dd;
-  border-top-color:var(--accent);
-  border-radius:50%;
-  margin:0 auto 13px;
-  animation:spin .7s linear infinite
-}
-
-/* 认出身份时：转圈放大成一圈光环，中央放首字母头像 */
-.loader-identity {
+/* ===== 加载页：Logo 外环走一圈 Material 风格的不定长弧线 ===== */
+.loader-mark {
   position:relative;
   display:grid;
   place-items:center;
-  width:34px;
-  height:34px;
-  margin:0 auto 13px;
-  transition:width .3s cubic-bezier(.22,1,.36,1),height .3s cubic-bezier(.22,1,.36,1)
+  width:76px;
+  height:76px;
+  margin:0 auto 20px
 }
 
-.loader-identity .spinner { margin:0 }
-
-.loader-identity.has-avatar {
-  width:64px;
-  height:64px;
-  margin-bottom:16px
-}
-
-.loader-identity.has-avatar .spinner {
-  width:64px;
-  height:64px;
-  border-width:2px;
-  border-color:rgba(53,125,99,.15);
-  border-top-color:var(--accent);
-  animation-duration:1.2s
-}
-
-.loader-avatar {
+.loader-arc {
   position:absolute;
-  display:grid;
-  place-items:center;
+  inset:0;
+  width:100%;
+  height:100%;
+  animation:loader-arc-rotate 1.9s linear infinite
+}
+
+.loader-arc circle {
+  fill:none;
+  stroke:var(--accent);
+  stroke-width:3;
+  stroke-linecap:round;
+  transform-origin:center;
+  transform:rotate(-90deg);
+  animation:loader-arc-dash 1.5s cubic-bezier(.4,0,.2,1) infinite
+}
+
+.logo.loader-logo {
   width:42px;
   height:42px;
-  border-radius:50%;
-  background:var(--accent);
-  color:#fff;
-  font:600 17px 'DM Mono',monospace;
-  letter-spacing:.02em;
-  animation:loader-avatar-in .46s cubic-bezier(.22,1,.36,1) both
+  border-radius:14px;
+  animation:loader-logo-breathe 2.6s ease-in-out infinite
 }
 
-.loader-avatar[hidden] { display:none }
+.logo.loader-logo:after {
+  width:15px;
+  height:15px;
+  top:10.5px;
+  left:10.5px
+}
 
 .loader-box b.loader-greeting {
   display:block;
-  margin-bottom:6px;
+  margin-bottom:7px;
   color:var(--ink);
-  font-size:18px;
+  font-size:19px;
   font-weight:600;
   letter-spacing:.01em;
   animation:loader-greeting-in .46s cubic-bezier(.22,1,.36,1) both
@@ -1062,30 +1050,20 @@ main {
   opacity:.72
 }
 
-.loader-box.has-greeting .loader-progress { margin-top:19px }
-
-.loader-progress {
-  display:flex;
-  justify-content:center;
-  gap:6px;
-  margin-top:22px
+@keyframes loader-arc-rotate {
+  to { transform:rotate(360deg) }
 }
 
-.loader-progress i {
-  width:6px;
-  height:6px;
-  border-radius:50%;
-  background:#b9d9d0;
-  animation:loader-pulse 1.15s ease-in-out infinite
+/* 弧线长度与偏移同时变化，得到「甩出去再收回来」的手感；213.6 = 2πr（r=34） */
+@keyframes loader-arc-dash {
+  0% { stroke-dasharray:4 213.6; stroke-dashoffset:0 }
+  50% { stroke-dasharray:148 213.6; stroke-dashoffset:-30 }
+  100% { stroke-dasharray:4 213.6; stroke-dashoffset:-213.6 }
 }
 
-.loader-progress i:nth-child(2) { animation-delay:.15s }
-.loader-progress i:nth-child(3) { animation-delay:.3s }
-
-/* 加载页身份问候动画 */
-@keyframes loader-avatar-in {
-  from { opacity:0; transform:scale(.72) }
-  to { opacity:1; transform:none }
+@keyframes loader-logo-breathe {
+  0%,100% { transform:scale(1) }
+  50% { transform:scale(.93) }
 }
 
 @keyframes loader-greeting-in {
@@ -1096,18 +1074,6 @@ main {
 @keyframes loader-enter {
   from { opacity:0; transform:translateY(10px) scale(.98) }
   to { opacity:1; transform:none }
-}
-
-@keyframes loader-pulse {
-  0%,100% { transform:scale(.75); background:#b9d9d0 }
-  50% { transform:scale(1.2); background:var(--accent) }
-}
-
-@keyframes spin {
-  to {
-    transform:rotate(360deg)
-  }
-
 }
 
 .modal {
@@ -2203,7 +2169,7 @@ main {
 [data-theme="dark"] .weather-day, [data-theme="dark"] .countdown-item, [data-theme="dark"] .countdown-setting-row { background:#101815 }
 [data-theme="dark"] .mobile-nav { background:rgba(21,29,25,.94) }
 [data-theme="dark"] .app-loader { background:#0e1311; color:var(--muted) }
-[data-theme="dark"] .loader-identity.has-avatar .spinner { border-color:rgba(122,214,177,.16); border-top-color:var(--accent) }
+[data-theme="dark"] .loader-arc circle { stroke:#4fbf9b }
 [data-theme="dark"] .hero .temp span, [data-theme="dark"] .home-title { color:var(--ink) }
 [data-theme="dark"] .detail-state { background:#101815 }
 [data-theme="dark"] .detail-attrs div { border-color:#232e28 }
@@ -2495,7 +2461,7 @@ main {
 
 .workspace-detail-modal-box .card-head>div:first-child{min-width:0;flex:1}.workspace-detail-modal-box .card-head>div:first-child h2{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.workspace-detail-modal-box .card-head>.more{width:30px;height:30px;display:grid;place-items:center;flex:none}.workspace-detail-launcher{position:fixed;right:78px;bottom:20px;z-index:91;width:50px;height:50px;display:none;border:0;border-radius:16px;background:#4c7dff;color:#fff;font-size:22px;box-shadow:0 12px 30px rgba(76,125,255,.28);cursor:pointer}.workspace-detail-launcher.show{display:grid;place-items:center}.workspace-detail-launcher:hover{transform:translateY(-3px)}
 
-@media (prefers-reduced-motion:reduce) { .spinner,.loader-progress i,.loader-box,.loader-avatar,.loader-box b.loader-greeting { animation:none!important } .loader-identity { transition:none!important } }
+@media (prefers-reduced-motion:reduce) { .loader-box,.loader-box b.loader-greeting,.logo.loader-logo { animation:none!important } .loader-arc { animation-duration:3s!important } .loader-arc circle { animation:none!important; stroke-dasharray:54 213.6 } }
 
 
 /* DSH 工作区分组、会话状态与实时输出 */

@@ -114,7 +114,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     }
     async function loadSsoIdentity(){try{const response=await oidcFetch('config.php?action=identity',{cache:'no-store'}),config=await response.json();const identity=config?.identity||null;saveLastIdentity(identity);return identity}catch(error){return null}}
     function setLoaderStage(title='正在加载你的生活中枢',detail='正在准备安全连接…',stage=0){const loader=$('#app-loader');if(!loader)return;renderLoaderWelcome();$('#loader-title').textContent=title;$('#loader-detail').textContent=detail;loader.dataset.stage=String(stage);loader.classList.remove('hidden');loader.setAttribute('aria-busy','true')}
-    /* 加载页问候：认出身份时把转圈换成头像光环，并把大字标题让给「晚上好，guyao」。 */
+    /* 加载页问候：Logo 外圈跑弧线，识别到身份时把大字标题让给「晚上好，guyao」。 */
     function loaderWelcomeName(){
       const identity=readLastIdentity();
       const oidcName=String(identity?.username||identity?.email||'').trim();
@@ -124,13 +124,10 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       return displayName()
     }
     function renderLoaderWelcome(){
-      const box=$('#app-loader')?.querySelector('.loader-box'),avatar=$('#loader-avatar'),greeting=$('#loader-greeting');
-      if(!box||!avatar||!greeting)return;
+      const box=$('#app-loader')?.querySelector('.loader-box'),greeting=$('#loader-greeting');
+      if(!box||!greeting)return;
       const name=loaderWelcomeName();
-      if(!name){box.classList.remove('has-greeting');avatar.parentElement.classList.remove('has-avatar');avatar.hidden=true;greeting.hidden=true;return}
-      avatar.textContent=name.slice(0,1).toUpperCase();
-      avatar.hidden=false;
-      avatar.parentElement.classList.add('has-avatar');
+      if(!name){box.classList.remove('has-greeting');greeting.hidden=true;return}
       greeting.textContent=`${greetingForHour(new Date().getHours())}，${name}`;
       greeting.hidden=false;
       box.classList.add('has-greeting')
