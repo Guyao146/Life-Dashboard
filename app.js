@@ -7,9 +7,9 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     let LOCAL=null;
     const redirectUri=location.origin+location.pathname;
     let HA=null;
-    const oidcSessionKey='life-hub-oidc';
+    const oidcSessionKey='life-hub-oidc',refreshMissingKey='life-hub-refresh-missing';
     function ensureAdminStatus(){const card=$('#settings-connect')?.closest('.settings-card');if(!card)return null;let status=$('#admin-identity-status');if(!status){status=document.createElement('div');status.id='admin-identity-status';status.className='connection-note';card.querySelector('.settings-actions')?.before(status)}return status}
-    function renderAdminStatus(config){const status=ensureAdminStatus();if(!status)return;const identity=config?.identity||{},auth=config?.authorization||{},groups=Array.isArray(auth.groups)?auth.groups:[],allowed=Array.isArray(auth.allowedGroups)?auth.allowedGroups:[];status.textContent=`OIDC：${identity.username||identity.email||'未识别账号'} · ${auth.administrator?'管理员已匹配':'非管理员'} · 当前组：${groups.join('、')||'未收到 groups 声明'} · 允许组：${allowed.join('、')||'未配置'}`}
+    function renderAdminStatus(config){const status=ensureAdminStatus();if(!status)return;const identity=config?.identity||{},auth=config?.authorization||{},groups=Array.isArray(auth.groups)?auth.groups:[],allowed=Array.isArray(auth.allowedGroups)?auth.allowedGroups:[];const session=readOidcSession();const renew=session?.refresh_token?'可自动续期':'无 refresh_token（请在 Authentik provider 的 Scope mapping 中加入 offline_access）';status.textContent=`OIDC：${identity.username||identity.email||'未识别账号'} · ${auth.administrator?'管理员已匹配':'非管理员'} · 登录续期：${renew} · 当前组：${groups.join('、')||'未收到 groups 声明'} · 允许组：${allowed.join('、')||'未配置'}`}
     async function loadRuntimeConfig(){
       const response=await fetch('config.php?action=public',{cache:'no-store'}),config=await response.json();
       if(!response.ok||!config.ok)throw new Error(config.error||`公开配置接口返回 HTTP ${response.status}`);
@@ -63,7 +63,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       location.assign(OIDC.authorize+'?'+p)
     }
     /* ===== 静默 SSO：顶层 prompt=none 检测 Authentik 会话（Authentik 禁止 iframe 嵌入） ===== */
-    const silentFlowKey='life-hub-silent-flow',lastIdentityKey='life-hub-last-identity';
+    const silentFlowKey='life-hub-silent-flow',lastIdentityKey='life-hub-last-identity',silentRenewKey='life-hub-silent-renew';
     /* prompt=none 返回这些错误时，说明验证服务其实已有会话，只是还需要一次交互
        （最常见的是授权流程没设成隐式同意，返回 consent_required）。
        这种情况下依然要显示“以 *** 的身份继续”，点击后走一次正常授权即可。 */
@@ -96,11 +96,17 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       $('#auth-sso-switch').onclick=()=>{clearOidcSession();forgetLastIdentity();sessionStorage.setItem(silentFlowKey,'switched');hideSsoIdentity();loginError('已切换为手动登录，请选择登录方式')};
       return true
     }
-    async function trySilentSignIn(){
+    async function trySilentSignIn(options={}){
       if(!OIDC||!window.isSecureContext)return false;
-      if(sessionStorage.getItem(silentFlowKey))return false;
+      if(!options.force&&sessionStorage.getItem(silentFlowKey))return false;
+      /* 静默续期兜底：同一标签页内至少间隔 20 秒，避免 Authentik 反复拒绝时来回跳转。 */
+      if(options.force){
+        const last=Number(sessionStorage.getItem(silentRenewKey)||0);
+        if(Date.now()-last<20000)return false;
+        sessionStorage.setItem(silentRenewKey,String(Date.now()))
+      }
       const {verifier,challenge}=await pkce(),state=b64url(crypto.getRandomValues(new Uint8Array(20)));
-      sessionStorage.setItem('life-hub-pkce',JSON.stringify({verifier,state,silent:true}));
+      sessionStorage.setItem('life-hub-pkce',JSON.stringify({verifier,state,silent:true,renew:!!options.force}));
       sessionStorage.setItem(silentFlowKey,'pending');
       const p=new URLSearchParams({client_id:OIDC.clientId,response_type:'code',redirect_uri:redirectUri,scope:'openid profile email offline_access',state,prompt:'none',code_challenge:challenge,code_challenge_method:'S256'});
       location.assign(OIDC.authorize+'?'+p);
@@ -140,12 +146,36 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     function readSession(key){try{return JSON.parse(sessionStorage.getItem(key)||'null')}catch(err){sessionStorage.removeItem(key);return null}}
     function readOidcSession(){try{const stored=JSON.parse(localStorage.getItem(oidcSessionKey)||'null');if(stored)return stored;const legacy=readSession(oidcSessionKey);if(legacy){localStorage.setItem(oidcSessionKey,JSON.stringify(legacy));sessionStorage.removeItem(oidcSessionKey)}return legacy}catch(err){localStorage.removeItem(oidcSessionKey);sessionStorage.removeItem(oidcSessionKey);return null}}
     function clearOidcSession(){localStorage.removeItem(oidcSessionKey);sessionStorage.removeItem(oidcSessionKey);sessionStorage.removeItem('life-hub-dashboard-access')}
-    function saveOidcSession(tokens,previous=null){const now=Date.now(),rememberUntil=previous?.rememberUntil||now+(Number(OIDC?.rememberDays)||30)*86400000,next={...previous,...tokens,refresh_token:tokens.refresh_token||previous?.refresh_token||'',expiresAt:now+(Number(tokens.expires_in)||3600)*1000,rememberUntil};localStorage.setItem(oidcSessionKey,JSON.stringify(next));return next}
+    function saveOidcSession(tokens,previous=null){const now=Date.now(),rememberUntil=previous?.rememberUntil||now+(Number(OIDC?.rememberDays)||30)*86400000,next={...previous,...tokens,refresh_token:tokens.refresh_token||previous?.refresh_token||'',expiresAt:now+(Number(tokens.expires_in)||3600)*1000,rememberUntil};localStorage.setItem(oidcSessionKey,JSON.stringify(next));
+      /* 没拿到 refresh_token 时，access token 一到期（Authentik 默认很短）就只能重新登录。
+         记下这个状态，登录页与设置页可以直接指出是 offline_access 没配好。 */
+      if(next.refresh_token)localStorage.removeItem(refreshMissingKey);else localStorage.setItem(refreshMissingKey,String(Date.now()));
+      return next}
     let oidcRefreshPromise=null;
     async function performOidcRefresh(session){const latest=readOidcSession();if(!latest?.refresh_token||latest.rememberUntil<=Date.now())throw new Error('登录已过期');if(latest.refresh_token!==session.refresh_token||Number(latest.expiresAt)>Number(session.expiresAt))return latest;const form=new URLSearchParams({grant_type:'refresh_token',client_id:OIDC.clientId,refresh_token:latest.refresh_token});const response=await fetch(OIDC.token,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form});const tokens=await response.json().catch(()=>({}));if(!response.ok){const current=readOidcSession();if(current&&(current.refresh_token!==latest.refresh_token||Number(current.expiresAt)>Number(latest.expiresAt)))return current;throw new Error(tokens.error_description||tokens.error||'登录续期失败')}if(!tokens?.access_token)throw new Error('续期结果缺少 access_token');return saveOidcSession(tokens,latest)}
     async function refreshOidcSession(session){if(oidcRefreshPromise)return oidcRefreshPromise;const run=()=>performOidcRefresh(session);oidcRefreshPromise=(navigator.locks?.request?navigator.locks.request('life-hub-oidc-refresh',{mode:'exclusive'},run):run()).catch(error=>{const current=readOidcSession();if(current&&(current.refresh_token!==session.refresh_token||Number(current.expiresAt)>Number(session.expiresAt)))return current;clearOidcSession();throw error}).finally(()=>{oidcRefreshPromise=null});return oidcRefreshPromise}
     async function validOidcSession(forceRefresh=false){const session=readOidcSession();if(!session||session.rememberUntil<=Date.now()){clearOidcSession();return null}if(!forceRefresh&&session.access_token&&session.expiresAt>Date.now()+60000)return session;try{return await refreshOidcSession(session)}catch(error){return null}}
-    function returnToLogin(message='登录已失效，请重新登录'){clearOidcSession();HA=null;if(workspaceTimer){clearInterval(workspaceTimer);workspaceTimer=0}if(syncTimer){clearInterval(syncTimer);syncTimer=null}$('#auth-gate').classList.remove('hidden');finishDashboardLoad();loginError(message);history.replaceState({},document.title,redirectUri)}
+    /* access token 失效时：优先用 refresh_token 续期；
+       拿不到 refresh_token（Authentik 未配 offline_access）时，退回一次
+       prompt=none 静默重授权，让用户感觉不到中断。 */
+    function returnToLogin(message='登录已失效，请重新登录'){
+      const hadRefreshToken=!!readOidcSession()?.refresh_token;
+      clearOidcSession();HA=null;
+      if(workspaceTimer){clearInterval(workspaceTimer);workspaceTimer=0}
+      if(syncTimer){clearInterval(syncTimer);syncTimer=null}
+      if(!hadRefreshToken&&OIDC&&window.isSecureContext){
+        setLoaderStage('正在续期登录','正在与樱落怡然验证服务重新建立会话…',1);
+        trySilentSignIn({force:true}).then(started=>{if(started)return;showLoginGate(message)}).catch(()=>showLoginGate(message));
+        return
+      }
+      showLoginGate(message)
+    }
+    function showLoginGate(message){
+      $('#auth-gate').classList.remove('hidden');
+      finishDashboardLoad();
+      loginError(message);
+      history.replaceState({},document.title,redirectUri)
+    }
     async function oidcFetch(url,options={},retry=true){const session=await validOidcSession();if(!session){returnToLogin();throw new Error('登录已失效')}const headers={...(options.headers||{}),Authorization:'Bearer '+session.access_token},response=await fetch(url,{...options,headers});if(response.status===401&&retry){const refreshed=await validOidcSession(true);if(refreshed)return oidcFetch(url,options,false)}if(response.status===401){returnToLogin();throw new Error('登录已失效')}return response}
     async function authenticate(){
       const params=new URLSearchParams(location.search),stored=await validOidcSession();
@@ -161,9 +191,12 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
           $('#app-loader').classList.add('hidden');
           if(interactiveSilentErrors.has(errorCode)){
             sessionStorage.setItem(silentFlowKey,'interaction');
-            renderSsoIdentity(readLastIdentity(),'consent')
+            renderSsoIdentity(readLastIdentity(),'consent');
+            if(pending?.renew)loginError('登录需要重新确认：验证服务的授权流程不是隐式同意，请点击上方按钮继续');
+            else if(localStorage.getItem(refreshMissingKey))loginError('提示：验证服务未下发 refresh_token，登录会很快过期。请在 Authentik provider 的 Scope mapping 中加入 offline_access');
           }else{
-            sessionStorage.setItem(silentFlowKey,'unavailable')
+            sessionStorage.setItem(silentFlowKey,'unavailable');
+            if(pending?.renew)loginError('登录已过期，请重新登录')
           }
           return false
         }
@@ -195,7 +228,12 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       sessionStorage.setItem(silentFlowKey,'done');
       history.replaceState({},document.title,redirectUri);
       if(pending.silent){
-        // 静默探测成功：停在登录页展示“以 *** 的身份继续”，由用户确认后再进入看板。
+        if(pending.renew){
+          // 静默续期成功：直接回到看板，不打断使用。
+          setLoaderStage('登录已续期','正在重新连接你的生活中枢…',2);enterDashboard(true);
+          return true
+        }
+        // 首次静默探测成功：停在登录页展示“以 *** 的身份继续”，由用户确认后再进入看板。
         $('#app-loader').classList.add('hidden');
         renderSsoIdentity(await loadSsoIdentity());
         return false
@@ -210,8 +248,10 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     function logout(){
       clearOidcSession();
       forgetLastIdentity();
+      localStorage.removeItem(refreshMissingKey);
       sessionStorage.removeItem('life-hub-pkce');
       sessionStorage.removeItem(silentFlowKey);
+      sessionStorage.removeItem(silentRenewKey);
       sessionStorage.removeItem(localSessionKey);
       sessionStorage.removeItem(localFailsKey);
       sessionStorage.removeItem(localLockKey);

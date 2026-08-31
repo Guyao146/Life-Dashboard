@@ -156,6 +156,29 @@ curl -i https://life.example.com/.env
 
 > 「改用其他账号登录」会清除本机记住的身份并停止本标签页的静默探测；「清除本机登录信息」会额外清掉静默探测标记，下次打开重新探测。
 
+### 登录很快就过期？必须开启 `offline_access`
+
+**这是最常见的「每隔几分钟就要重新登录」的原因。** Authentik 默认只下发 access token，不下发 refresh token；access token 的有效期在 provider 里默认只有几分钟，一到期看板就没有任何东西可以用来续期。
+
+按官方文档，应用要拿到 refresh token，**provider 和应用两边都必须请求 `offline_access` scope**。看板侧已经在授权请求里带了 `offline_access`，还需要在 Authentik 补上服务端配置：
+
+1. 打开 **Applications → Providers**，编辑看板对应的 OAuth2/OpenID Provider；
+2. 在 **Advanced protocol settings → Scope mapping** 中加入 `authentik default OAuth Mapping: OpenID 'offline_access'`（与 `openid`、`profile`、`email` 一并选中）；
+3. 顺手确认同一页的有效期设置，建议：
+   - **Access token validity**：`minutes=10` 或 `hours=1`
+   - **Refresh token validity**：`days=30`（与 `.env` 的 `LIFE_HUB_OIDC_REMEMBER_DAYS` 对应）
+4. 保存后在看板点「清除本机登录信息」，重新登录一次，让新的授权带回 refresh token。
+
+配置是否生效可以在 **设置 → 连接与账户** 的身份诊断行查看：出现「登录续期：可自动续期」即为正常；若显示「无 refresh_token」，说明第 2 步没生效。
+
+即使没有 refresh token，看板也不会直接把你踢回登录页：access token 失效时会先尝试一次 `prompt=none` 静默重授权（同一标签页至少间隔 20 秒），成功则无感回到看板。但这依赖 Authentik 会话仍然有效，且每次都会有一次极快的跳转，不能替代 `offline_access`。
+
+### 关于「像 Google 那样的登录弹窗」
+
+Google 账号那种不跳转、直接浮在页面上的账号选择气泡，用的是浏览器原生的 FedCM（Federated Credential Management）API，需要身份提供方实现 `/.well-known/web-identity` 等一套端点。**Authentik 目前没有实现 FedCM**，所以这种弹窗在自建 Authentik 上无法做到。
+
+看板能做到的最接近效果就是当前方案：静默探测 + 登录页的「以 *** 的身份继续」身份卡片，代价是首次进入时一次极快的顶层跳转。
+
 ---
 
 

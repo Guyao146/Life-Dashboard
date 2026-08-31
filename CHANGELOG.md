@@ -6,6 +6,19 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [1.0.7] - 2026-08-31
+
+### 新增
+
+- access token 失效且本机没有 refresh_token 时，不再直接退回登录页，而是先尝试一次 `prompt=none` 静默重授权，成功则无感回到看板（同一标签页至少间隔 20 秒，避免跳转循环）。
+- 设置 → 连接与账户的身份诊断新增「登录续期」一项，直接显示当前会话是否拿到了 refresh_token，未拿到时提示需要在 Authentik provider 的 Scope mapping 中加入 `offline_access`。
+- 静默重授权因缺少同意而失败时，登录页会明确说明原因，而不是只显示一句「登录已失效」。
+
+### 文档
+
+- README 新增「登录很快就过期？必须开启 `offline_access`」小节，说明 Authentik 默认不下发 refresh token 是频繁重新登录的根因，并给出 Scope mapping 与令牌有效期的推荐配置。
+- README 说明 Google 账号那种不跳转的登录气泡依赖浏览器 FedCM API，Authentik 目前未实现，因此无法在自建部署上做到。
+
 ## [1.0.6] - 2026-08-31
 
 ### 变更
