@@ -6,6 +6,14 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [1.0.1] - 2026-08-31
+
+### 修复
+
+- 静默单点登录改为顶层 `prompt=none` 跳转检测，修复 Authentik 设置 `X-Frame-Options: deny` 导致隐藏 iframe 探测失败并返回 HTTP 400 的问题。
+- 移除不再需要的 `silent-callback.html`，静默探测复用现有回调地址，无需在 Authentik 追加额外重定向 URI。
+- 探测返回 `login_required` 等交互错误时静默退回正常登录页，不再显示“验证服务拒绝登录”。
+
 ## [1.0.0] - 2026-08-25
 
 ### 新增
@@ -76,6 +84,7 @@
 - 工作区详情弹窗改为根据自身宽度响应：窄弹窗自动切换为上下布局，记录正文不再被挤成逐字换行，消息输入区保持完整可用。
 - 优化窄弹窗中的会话列表、记录卡片、时间标签和发送区尺寸，提高桌面小窗与移动端可读性。
 
+[1.0.1]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.1
 [1.0.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.0
 [0.10.7]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.10.7
 [0.10.6]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.10.6
