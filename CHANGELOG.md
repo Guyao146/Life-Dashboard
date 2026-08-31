@@ -6,6 +6,20 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [1.0.3] - 2026-08-31
+
+### 修复
+
+- 静默单点登录探测返回 `consent_required`、`interaction_required`、`account_selection_required` 时，不再静默退回普通登录页；登录页会照常显示「以 *** 的身份继续」，点击后走一次正常授权即可进入看板。
+- 因此，即使 Authentik 授权流程仍是显式同意（未改成 `default-provider-authorization-implicit-consent`），身份卡片也会出现。
+
+### 新增
+
+- 本机记住上次成功登录的 Authentik 身份（`life-hub-last-identity`，仅用户名与邮箱），用于在需要交互的探测结果中展示身份卡片。
+- 确认身份卡片时会带上 `login_hint`，让验证服务直接落到该账号。
+- 「清除本机登录信息」会同时清除记住的身份与静默探测标记，下次打开登录页重新探测。
+- README 新增「Authentik 静默单点登录」章节，说明三种探测结果与隐式同意流程的配置步骤。
+
 ## [1.0.2] - 2026-08-31
 
 ### 修复

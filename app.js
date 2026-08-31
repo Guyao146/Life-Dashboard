@@ -42,6 +42,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       if(!token)throw new Error('只有 Authentik 管理员登录可以加载 Home Assistant 私密配置');
       const response=await oidcFetch('config.php?action=private',{cache:'no-store'}),config=await response.json();
       renderAdminStatus(config);
+      saveLastIdentity(config?.identity);
       if(!response.ok||!config.ok)throw new Error(config.error||`私密配置接口返回 HTTP ${response.status}`);
       if(!config?.homeAssistant?.url||!config?.homeAssistant?.token)throw new Error('.env 中缺少 Home Assistant 配置');
       HA={...config.homeAssistant,url:String(config.homeAssistant.url).replace(/\/$/,'')};
@@ -51,18 +52,50 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     async function pkce(){const bytes=crypto.getRandomValues(new Uint8Array(48)),verifier=b64url(bytes),digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(verifier));return {verifier,challenge:b64url(digest)}}
     function loginError(m){$('#auth-error').textContent=m}
     function setLoginReady(ready){const button=$('#auth-login');button.disabled=!ready;if(ready&&$('#auth-error').textContent.includes('配置'))loginError('');if(ready&&LOCAL?.invalid)loginError('本地账号配置无效：服务器 .env 中的 salt 或密码哈希仍是占位值，可先使用 樱落怡然验证服务 登录')}
-    async function signIn(){
+    async function signIn(loginHint=''){
       if(!OIDC)throw new Error('登录配置尚未加载完成');
       if(!window.isSecureContext)throw new Error('Authentik 登录需要 HTTPS 部署（localhost 除外）');
       const {verifier,challenge}=await pkce(),state=b64url(crypto.getRandomValues(new Uint8Array(20)));
       sessionStorage.setItem('life-hub-pkce',JSON.stringify({verifier,state}));
       const p=new URLSearchParams({client_id:OIDC.clientId,response_type:'code',redirect_uri:redirectUri,scope:'openid profile email offline_access',state,code_challenge:challenge,code_challenge_method:'S256'});
+      // login_hint 让验证服务直接落到这个账号；不支持时会被忽略，不影响正常登录。
+      if(loginHint)p.set('login_hint',loginHint);
       location.assign(OIDC.authorize+'?'+p)
     }
     /* ===== 静默 SSO：顶层 prompt=none 检测 Authentik 会话（Authentik 禁止 iframe 嵌入） ===== */
-    const silentFlowKey='life-hub-silent-flow';
+    const silentFlowKey='life-hub-silent-flow',lastIdentityKey='life-hub-last-identity';
+    /* prompt=none 返回这些错误时，说明验证服务其实已有会话，只是还需要一次交互
+       （最常见的是授权流程没设成隐式同意，返回 consent_required）。
+       这种情况下依然要显示“以 *** 的身份继续”，点击后走一次正常授权即可。 */
+    const interactiveSilentErrors=new Set(['consent_required','interaction_required','account_selection_required']);
+    function readLastIdentity(){try{const stored=JSON.parse(localStorage.getItem(lastIdentityKey)||'null');if(!stored)return null;const username=String(stored.username||'').trim(),email=String(stored.email||'').trim();return username||email?{username,email}:null}catch(error){localStorage.removeItem(lastIdentityKey);return null}}
+    function saveLastIdentity(identity){const username=String(identity?.username||'').trim(),email=String(identity?.email||'').trim();if(!username&&!email)return;try{localStorage.setItem(lastIdentityKey,JSON.stringify({username,email,savedAt:Date.now()}))}catch(error){}}
+    function forgetLastIdentity(){try{localStorage.removeItem(lastIdentityKey)}catch(error){}}
     function ssoStatus(){return $('#auth-sso')}
-    function renderSsoIdentity(identity){const box=ssoStatus();if(!box)return;const name=identity?.username||identity?.email||'';if(!name){box.hidden=true;box.innerHTML='';return}box.hidden=false;box.innerHTML=`<button class="btn primary auth-sso-continue" id="auth-sso-continue" type="button"><span class="auth-sso-avatar">${escapeHtml(name.slice(0,1).toUpperCase())}</span><span class="auth-sso-copy"><small>检测到 樱落怡然验证服务 已登录</small><b>以 ${escapeHtml(name)} 的身份继续</b></span></button><button class="btn auth-sso-switch" id="auth-sso-switch" type="button">改用其他账号登录</button>`;$('#auth-sso-continue').onclick=()=>{loginError('');location.assign(redirectUri)};$('#auth-sso-switch').onclick=()=>{clearOidcSession();sessionStorage.setItem(silentFlowKey,'switched');box.hidden=true;box.innerHTML='';loginError('已切换为手动登录，请选择登录方式')}}
+    function hideSsoIdentity(){const box=ssoStatus();if(!box)return;box.hidden=true;box.innerHTML=''}
+    /* mode='session'：静默探测已换到令牌，点击直接进看板。
+       mode='consent'：验证服务有会话但需要一次交互，点击走一次正常授权。 */
+    function renderSsoIdentity(identity,mode='session'){
+      const box=ssoStatus();if(!box)return false;
+      const name=String(identity?.username||identity?.email||'').trim();
+      if(!name&&mode!=='consent'){hideSsoIdentity();return false}
+      const hint=String(identity?.email||identity?.username||'').trim();
+      const avatar=name?name.slice(0,1).toUpperCase():'❀';
+      const headline=name?`以 ${escapeHtml(name)} 的身份继续`:'使用已登录的账号继续';
+      box.hidden=false;
+      box.innerHTML=`<button class="btn primary auth-sso-continue" id="auth-sso-continue" type="button"><span class="auth-sso-avatar">${escapeHtml(avatar)}</span><span class="auth-sso-copy"><small>检测到 樱落怡然验证服务 已登录</small><b>${headline}</b></span></button><button class="btn auth-sso-switch" id="auth-sso-switch" type="button">改用其他账号登录</button>`;
+      $('#auth-sso-continue').onclick=()=>{
+        if(mode==='consent'){
+          loginError('正在跳转到 验证服务…');
+          sessionStorage.setItem(silentFlowKey,'confirming');
+          signIn(hint).catch(error=>loginError(error.message));
+          return
+        }
+        loginError('');location.assign(redirectUri)
+      };
+      $('#auth-sso-switch').onclick=()=>{clearOidcSession();forgetLastIdentity();sessionStorage.setItem(silentFlowKey,'switched');hideSsoIdentity();loginError('已切换为手动登录，请选择登录方式')};
+      return true
+    }
     async function trySilentSignIn(){
       if(!OIDC||!window.isSecureContext)return false;
       if(sessionStorage.getItem(silentFlowKey))return false;
@@ -73,7 +106,13 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       location.assign(OIDC.authorize+'?'+p);
       return true
     }
-    async function loadSsoIdentity(){try{const response=await oidcFetch('config.php?action=identity',{cache:'no-store'}),config=await response.json();return config?.identity||null}catch(error){return null}}
+    /* 静默探测结束后（含刷新页面重进）根据探测结论决定是否展示登录身份卡片。 */
+    function restoreSsoIdentity(){
+      const flow=sessionStorage.getItem(silentFlowKey);
+      if(flow!=='interaction'&&flow!=='confirming')return false;
+      return renderSsoIdentity(readLastIdentity(),'consent')
+    }
+    async function loadSsoIdentity(){try{const response=await oidcFetch('config.php?action=identity',{cache:'no-store'}),config=await response.json();const identity=config?.identity||null;saveLastIdentity(identity);return identity}catch(error){return null}}
     function setLoaderStage(title='正在加载你的生活中枢',detail='正在准备安全连接…',stage=0){const loader=$('#app-loader');if(!loader)return;$('#loader-title').textContent=title;$('#loader-detail').textContent=detail;loader.dataset.stage=String(stage);loader.classList.remove('hidden');loader.setAttribute('aria-busy','true')}
     function finishDashboardLoad(){const loader=$('#app-loader');if(!loader)return;loader.setAttribute('aria-busy','false');loader.classList.add('hidden')}
     function enterDashboard(keepLoader=false){
@@ -95,15 +134,22 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       const silentPending=sessionStorage.getItem(silentFlowKey)==='pending';
       if(params.get('error')){
         const pending=readSession('life-hub-pkce');
+        const errorCode=String(params.get('error')||'');
         sessionStorage.removeItem('life-hub-pkce');
         history.replaceState({},document.title,redirectUri);
         if(silentPending||pending?.silent){
-          // prompt=none 只是探测：未登录/需要交互时静默退回正常登录页。
-          sessionStorage.setItem(silentFlowKey,'unavailable');
+          // prompt=none 只是探测：未登录时静默退回正常登录页；
+          // 需要一次交互（consent_required 等）时说明会话确实存在，展示身份卡片。
           $('#app-loader').classList.add('hidden');
+          if(interactiveSilentErrors.has(errorCode)){
+            sessionStorage.setItem(silentFlowKey,'interaction');
+            renderSsoIdentity(readLastIdentity(),'consent')
+          }else{
+            sessionStorage.setItem(silentFlowKey,'unavailable')
+          }
           return false
         }
-        throw new Error(`验证服务拒绝登录：${params.get('error_description')||params.get('error')}`);
+        throw new Error(`验证服务拒绝登录：${params.get('error_description')||errorCode}`);
       }
       if(stored?.access_token){
         setLoaderStage('正在恢复登录','正在安全验证你的登录状态…',1);enterDashboard(true);
@@ -145,7 +191,9 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     $('#auth-continue')?.addEventListener('click',enterDashboard);
     function logout(){
       clearOidcSession();
+      forgetLastIdentity();
       sessionStorage.removeItem('life-hub-pkce');
+      sessionStorage.removeItem(silentFlowKey);
       sessionStorage.removeItem(localSessionKey);
       sessionStorage.removeItem(localFailsKey);
       sessionStorage.removeItem(localLockKey);
@@ -393,7 +441,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       }catch(err){notice(err.message)}
     };
     loadRuntimeConfig().then(()=>{setLoginReady(true);return authenticate()}).then(async ok=>{
-      if(!ok){if(await trySilentSignIn())return;return}
+      if(!ok){if(!restoreSsoIdentity()&&await trySilentSignIn())return;return}
       if(!readOidcSession())return;
       setLoaderStage('正在验证管理员权限','正在安全读取你的私密生活配置…',2);
       beginWorkspaceSync();

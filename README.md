@@ -134,7 +134,30 @@ curl -i https://life.example.com/.env
 
 ---
 
-## 🔑 本地账号密码登录（可选）
+## ❀ Authentik 静默单点登录
+
+打开登录页时，看板会向 Authentik 发起一次 `prompt=none` 的静默探测（Authentik 对授权页返回 `X-Frame-Options: deny`，因此无法用隐藏 iframe，只能顶层跳转，过程通常快到看不见）。探测结果分三种：
+
+| 探测结果 | 登录页表现 |
+| --- | --- |
+| 已有会话且授权流程为隐式同意 | 直接显示「以 *** 的身份继续」，点击即进入看板 |
+| 已有会话但返回 `consent_required` / `interaction_required` | 同样显示「以 *** 的身份继续」，点击后走一次正常授权（会带上 `login_hint`） |
+| 没有会话（`login_required`） | 静默退回普通登录页，不显示任何错误 |
+
+每个浏览器标签页只探测一次（用 `sessionStorage` 的 `life-hub-silent-flow` 标记），不会循环跳转。
+
+想要「点一下就进」的完全无感体验，需在 Authentik 里把该应用的授权流程设为隐式同意：
+
+1. 打开 **Applications → Providers**，编辑看板对应的 OAuth2/OpenID Provider；
+2. 把 **Authorization flow** 改为 `default-provider-authorization-implicit-consent`；
+3. 保存后重新打开看板登录页。
+
+若保留显式同意流程（`default-provider-authorization-explicit-consent`），静默探测会返回 `consent_required`；此时看板仍会显示身份卡片，只是点击后多一次 Authentik 同意页。
+
+> 「改用其他账号登录」会清除本机记住的身份并停止本标签页的静默探测；「清除本机登录信息」会额外清掉静默探测标记，下次打开重新探测。
+
+---
+
 
 登录卡片在 OAuth 按钮上方提供账号密码登录，密码使用浏览器端 PBKDF2-SHA256 校验；用户名与哈希由 PHP 公开配置接口提供。
 

@@ -2420,7 +2420,7 @@ main {
 @media(max-width:700px){.workspace-session-preview{grid-template-columns:10px minmax(0,1fr)}.workspace-session-preview small{grid-column:2}.workspace-session-preview-list,.workspace-session-empty,.workspace-open-detail{padding-left:34px;margin-left:0}.workspace-open-detail{margin-left:34px}}
 
 
-/* ????? SSO???? Authentik ??????? *** ??????? */
+/* 静默 SSO：登录页展示“以 *** 的身份继续”的身份卡片 */
 .auth-sso{display:grid;gap:8px;margin:4px 0 2px;animation:auth-sso-in .32s cubic-bezier(.22,1,.36,1) both}
 .auth-sso[hidden]{display:none}
 .auth-card .auth-sso-continue{display:grid;grid-template-columns:38px minmax(0,1fr);align-items:center;gap:11px;width:100%;padding:11px 13px;text-align:left}
