@@ -76,10 +76,19 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       const card=$('#auth-gate'),manual=$('#auth-manual'),sso=ssoStatus();
       card?.classList.toggle('auth-mode-sso',mode==='sso');
       card?.classList.toggle('auth-mode-manual',mode==='manual');
+      card?.classList.toggle('auth-mode-probe',mode==='probe');
       if(manual)manual.hidden=mode!=='manual';
       if(sso&&mode==='manual')sso.hidden=true;
     }
     function hideSsoIdentity(){const box=ssoStatus();if(!box)return;box.hidden=true;box.innerHTML=''}
+    function renderSsoProbe(){
+      const box=ssoStatus();
+      if(!box)return false;
+      setAuthMode('probe');
+      box.hidden=false;
+      box.innerHTML='<div class="auth-sso-probe" role="status"><span class="auth-sso-spinner" aria-hidden="true"></span><span class="auth-sso-copy"><small>正在连接樱落怡然验证服务</small><b>检测登录状态…</b></span></div>';
+      return true
+    }
     /* mode='session'：静默探测已换到令牌，点击直接进看板。
        mode='consent'：验证服务有会话但需要一次交互，点击走一次正常授权。 */
     function renderSsoIdentity(identity,mode='session'){
@@ -107,6 +116,11 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     async function trySilentSignIn(options={}){
       if(!OIDC||!window.isSecureContext)return false;
       if(!options.force&&sessionStorage.getItem(silentFlowKey))return false;
+      if(!options.force){
+        finishDashboardLoad();
+        $('#auth-gate')?.classList.remove('hidden');
+        renderSsoProbe();
+      }
       /* 静默续期兜底：同一标签页内至少间隔 20 秒，避免 Authentik 反复拒绝时来回跳转。 */
       if(options.force){
         const last=Number(sessionStorage.getItem(silentRenewKey)||0);
@@ -224,9 +238,15 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
         setAuthMode('manual');
         return false
       }
-      setLoaderStage('正在确认登录成功','正在与樱落怡然验证服务建立安全会话…',1);
       const pending=readSession('life-hub-pkce');
       if(!pending||pending.state!==params.get('state'))throw new Error('登录状态校验失败，请重新登录');
+      if(pending.silent&&!pending.renew){
+        finishDashboardLoad();
+        $('#auth-gate').classList.remove('hidden');
+        renderSsoProbe()
+      }else{
+        setLoaderStage('正在确认登录成功','正在与樱落怡然验证服务建立安全会话…',1)
+      }
       const form=new URLSearchParams({grant_type:'authorization_code',client_id:OIDC.clientId,code:params.get('code'),redirect_uri:redirectUri,code_verifier:pending.verifier});
       const response=await fetch(OIDC.token,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:form});
       if(!response.ok){sessionStorage.removeItem('life-hub-pkce');throw new Error('验证服务未接受登录请求，请检查回调地址、客户端类型和 CORS 设置')}

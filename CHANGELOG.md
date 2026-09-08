@@ -6,6 +6,13 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [1.0.10] - 2026-09-08
+
+### 优化
+
+- 检测 Authentik 登录状态时不再显示全屏加载动画，改为在登录身份区域展示紧凑的加载状态。
+- 静默登录探测回调期间继续使用局部加载提示，正常登录、续期和进入看板时仍保留原有全屏加载反馈。
+
 ## [1.0.9] - 2026-09-08
 
 ### 变更
@@ -156,6 +163,7 @@
 - 优化窄弹窗中的会话列表、记录卡片、时间标签和发送区尺寸，提高桌面小窗与移动端可读性。
 
 [1.0.2]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.2
+[1.0.10]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.10
 [1.0.9]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.9
 [1.0.8]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.8
 [1.0.1]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.1
