@@ -6,6 +6,13 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [1.0.8] - 2026-09-08
+
+### 修复
+
+- 登录页在发现已有单点登录会话时，仅显示对应的身份继续入口；切换其他账号后正确恢复账号密码与 OAuth 登录方式。
+- 优化窄屏登录页的间距和按钮尺寸，提升手机端登录体验。
+
 ## [1.0.7] - 2026-08-31
 
 ### 新增
@@ -142,6 +149,7 @@
 - 优化窄弹窗中的会话列表、记录卡片、时间标签和发送区尺寸，提高桌面小窗与移动端可读性。
 
 [1.0.2]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.2
+[1.0.8]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.8
 [1.0.1]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.1
 [1.0.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.0
 [0.10.7]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v0.10.7

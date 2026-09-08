@@ -72,6 +72,13 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     function saveLastIdentity(identity){const username=String(identity?.username||'').trim(),email=String(identity?.email||'').trim();if(!username&&!email)return;try{localStorage.setItem(lastIdentityKey,JSON.stringify({username,email,savedAt:Date.now()}))}catch(error){}}
     function forgetLastIdentity(){try{localStorage.removeItem(lastIdentityKey)}catch(error){}}
     function ssoStatus(){return $('#auth-sso')}
+    function setAuthMode(mode){
+      const card=$('#auth-gate'),manual=$('#auth-manual'),sso=ssoStatus();
+      card?.classList.toggle('auth-mode-sso',mode==='sso');
+      card?.classList.toggle('auth-mode-manual',mode==='manual');
+      if(manual)manual.hidden=mode!=='manual';
+      if(sso&&mode==='manual')sso.hidden=true;
+    }
     function hideSsoIdentity(){const box=ssoStatus();if(!box)return;box.hidden=true;box.innerHTML=''}
     /* mode='session'：静默探测已换到令牌，点击直接进看板。
        mode='consent'：验证服务有会话但需要一次交互，点击走一次正常授权。 */
@@ -83,6 +90,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
       const avatar=name?name.slice(0,1).toUpperCase():'❀';
       const headline=name?`以 ${escapeHtml(name)} 的身份继续`:'使用已登录的账号继续';
       box.hidden=false;
+      setAuthMode('sso');
       box.innerHTML=`<button class="btn primary auth-sso-continue" id="auth-sso-continue" type="button"><span class="auth-sso-avatar">${escapeHtml(avatar)}</span><span class="auth-sso-copy"><small>检测到 樱落怡然验证服务 已登录</small><b>${headline}</b></span></button><button class="btn auth-sso-switch" id="auth-sso-switch" type="button">改用其他账号登录</button>`;
       $('#auth-sso-continue').onclick=()=>{
         if(mode==='consent'){
@@ -93,7 +101,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
         }
         loginError('');location.assign(redirectUri)
       };
-      $('#auth-sso-switch').onclick=()=>{clearOidcSession();forgetLastIdentity();sessionStorage.setItem(silentFlowKey,'switched');hideSsoIdentity();loginError('已切换为手动登录，请选择登录方式')};
+      $('#auth-sso-switch').onclick=()=>{clearOidcSession();forgetLastIdentity();sessionStorage.setItem(silentFlowKey,'switched');hideSsoIdentity();setAuthMode('manual');loginError('')};
       return true
     }
     async function trySilentSignIn(options={}){
@@ -213,6 +221,7 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
           return true
         }
         $('#app-loader').classList.add('hidden');
+        setAuthMode('manual');
         return false
       }
       setLoaderStage('正在确认登录成功','正在与樱落怡然验证服务建立安全会话…',1);

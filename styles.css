@@ -1571,6 +1571,17 @@ main {
   line-height:1.6
 }
 
+/* 登录方式互斥显示：先突出已发现的 SSO 身份，手动登录按需展开。 */
+.auth-manual[hidden],
+.auth-sso[hidden] { display:none }
+.auth-mode-sso .auth-card > p { margin-bottom:20px }
+.auth-mode-sso .auth-sso { margin:0; gap:10px }
+.auth-mode-sso .auth-sso-continue { min-height:76px; border-radius:14px; box-shadow:0 10px 24px rgba(21,126,108,.16) }
+.auth-mode-sso .auth-sso-switch { background:transparent; color:var(--muted); border:0; text-decoration:underline; font-size:12px; font-weight:500 }
+.auth-mode-sso .auth-card-foot { margin-top:20px }
+.auth-sso-empty { display:grid; gap:6px; padding:14px 0 4px; color:var(--muted); font-size:12px; line-height:1.6 }
+.auth-sso-empty button { justify-self:start; padding:0; border:0; background:transparent; color:var(--accent); font:inherit; cursor:pointer; text-decoration:underline }
+
 @media (max-width:900px) {
   .auth-gate {
     grid-template-columns:1fr;
@@ -1584,6 +1595,13 @@ main {
   .auth-card {
     margin:0
   }
+}
+
+@media (max-width:520px) {
+  .auth-gate { padding:14px }
+  .auth-card { width:100%; margin:0; padding:30px 22px; border-radius:18px }
+  .auth-card h1 { font-size:22px }
+  .auth-card .btn { min-height:46px }
 }
 
 .mobile-nav {
