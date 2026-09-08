@@ -6,6 +6,13 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [1.0.9] - 2026-09-08
+
+### 变更
+
+- 重做登录页视觉层级，增加品牌标识、深色玻璃质感背景、SSO 身份卡片和更清晰的错误反馈。
+- 优化登录页在手机端的卡片尺寸、间距和按钮表现。
+
 ## [1.0.8] - 2026-09-08
 
 ### 修复
@@ -149,6 +156,7 @@
 - 优化窄弹窗中的会话列表、记录卡片、时间标签和发送区尺寸，提高桌面小窗与移动端可读性。
 
 [1.0.2]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.2
+[1.0.9]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.9
 [1.0.8]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.8
 [1.0.1]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.1
 [1.0.0]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.0

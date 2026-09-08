@@ -2500,3 +2500,130 @@ main {
 @keyframes auth-sso-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 [data-theme="dark"] .auth-sso-avatar{background:rgba(255,255,255,.14)}
 @media(prefers-reduced-motion:reduce){.auth-sso{animation:none}}
+
+/* 登录页视觉升级：保持认证逻辑不变，只增强品牌层级、层次与反馈状态。 */
+.auth-gate {
+  background:
+    radial-gradient(circle at 12% 18%, rgba(46,170,146,.12), transparent 28%),
+    radial-gradient(circle at 88% 82%, rgba(67,111,145,.1), transparent 30%),
+    #0b1110;
+}
+.auth-gate:before,
+.auth-gate:after {
+  content:'';
+  position:fixed;
+  pointer-events:none;
+  border:1px solid rgba(120,210,188,.08);
+  border-radius:50%;
+}
+.auth-gate:before { width:52vw; height:52vw; left:-25vw; top:-25vw }
+.auth-gate:after { width:42vw; height:42vw; right:-20vw; bottom:-22vw }
+.auth-panel {
+  background:linear-gradient(155deg,rgba(17,47,40,.88),rgba(12,26,23,.94));
+  border-right:1px solid rgba(139,220,198,.12);
+}
+.auth-card {
+  position:relative;
+  width:min(430px,calc(100% - 32px));
+  margin:16px;
+  padding:38px 36px 30px;
+  background:rgba(19,29,26,.88);
+  border:1px solid rgba(160,211,197,.16);
+  border-radius:26px;
+  box-shadow:0 30px 90px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.035);
+  backdrop-filter:blur(18px);
+}
+.auth-card:before {
+  content:'';
+  position:absolute;
+  inset:0 18% auto 18%;
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(95,210,183,.65),transparent);
+}
+.auth-card-brand {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  margin-bottom:27px;
+  color:#7da399;
+  font:500 10px 'DM Mono',monospace;
+  letter-spacing:.16em;
+}
+.auth-card-brand .logo {
+  width:28px;
+  height:28px;
+  border-radius:9px;
+  margin:0;
+  box-shadow:0 5px 18px rgba(35,182,155,.22);
+}
+.auth-card-brand .logo:after { width:12px; height:12px; top:8px; left:8px }
+.auth-card h1 {
+  color:#f1f7f4;
+  font-size:26px;
+  letter-spacing:.02em;
+  margin-bottom:9px;
+}
+.auth-card p { color:#8fa7a0; margin-bottom:27px }
+.auth-card .auth-sso-continue {
+  min-height:76px;
+  background:linear-gradient(135deg,#1c8f7c,#176d60);
+  border:1px solid rgba(130,237,211,.2);
+  border-radius:16px;
+  box-shadow:0 14px 28px rgba(5,83,68,.28), inset 0 1px 0 rgba(255,255,255,.12);
+  transition:transform .18s,box-shadow .18s,filter .18s;
+}
+.auth-card .auth-sso-continue:hover {
+  transform:translateY(-2px);
+  filter:saturate(1.08);
+  box-shadow:0 18px 34px rgba(5,83,68,.36), inset 0 1px 0 rgba(255,255,255,.15);
+}
+.auth-sso-avatar {
+  width:42px;
+  height:42px;
+  border:1px solid rgba(255,255,255,.24);
+  background:rgba(4,48,41,.28);
+  color:#e5fff8;
+}
+.auth-sso-copy small { color:#bce5da; font-size:10px }
+.auth-sso-copy b { color:#fff; font-size:15px }
+.auth-card .auth-sso-switch {
+  color:#8db1a7;
+  padding:10px 12px 4px;
+  text-decoration:none;
+}
+.auth-card .auth-sso-switch:hover { color:#c8eee4 }
+.auth-error {
+  min-height:0;
+  margin-top:16px;
+  padding:10px 12px;
+  border:1px solid rgba(222,104,88,.22);
+  border-radius:11px;
+  background:rgba(123,43,36,.18);
+  color:#ed8d7e;
+  text-align:left;
+}
+.auth-error:empty { display:none }
+.logout {
+  margin-top:17px;
+  color:#91aaa2!important;
+  text-decoration:none;
+  font-size:12px!important;
+}
+.logout:hover { color:#d1eee7!important; background:rgba(255,255,255,.045)!important }
+.auth-card-foot {
+  margin-top:22px;
+  padding-top:18px;
+  border-top:1px solid rgba(137,183,171,.13);
+  color:#718b83;
+  line-height:1.75;
+}
+@media (max-width:900px) {
+  .auth-gate { background-color:#0b1110 }
+  .auth-card { width:min(430px,calc(100% - 28px)); margin:14px }
+}
+@media (max-width:520px) {
+  .auth-card { padding:31px 22px 25px; border-radius:22px }
+  .auth-card-brand { margin-bottom:23px }
+  .auth-card h1 { font-size:24px }
+}
