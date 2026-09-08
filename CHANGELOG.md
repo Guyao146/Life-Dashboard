@@ -6,6 +6,12 @@
 - `MINOR`：向下兼容的新功能，例如 `0.3.0 → 0.4.0`
 - `MAJOR`：不兼容改动，例如 `0.3.0 → 1.0.0`
 
+## [1.0.11] - 2026-09-08
+
+### 优化
+
+- 增大登录页主要操作按钮之间的间距，使 SSO 继续、切换账号和清除登录信息的层级更清晰。
+
 ## [1.0.10] - 2026-09-08
 
 ### 优化
@@ -163,6 +169,7 @@
 - 优化窄弹窗中的会话列表、记录卡片、时间标签和发送区尺寸，提高桌面小窗与移动端可读性。
 
 [1.0.2]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.2
+[1.0.11]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.11
 [1.0.10]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.10
 [1.0.9]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.9
 [1.0.8]: https://github.com/Guyao146/Life-Dashboard/releases/tag/v1.0.8

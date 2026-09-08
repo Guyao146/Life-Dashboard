@@ -1575,7 +1575,7 @@ main {
 .auth-manual[hidden],
 .auth-sso[hidden] { display:none }
 .auth-mode-sso .auth-card > p { margin-bottom:20px }
-.auth-mode-sso .auth-sso { margin:0; gap:10px }
+.auth-mode-sso .auth-sso { margin:0; gap:16px }
 .auth-mode-sso .auth-sso-continue { min-height:76px; border-radius:14px; box-shadow:0 10px 24px rgba(21,126,108,.16) }
 .auth-mode-sso .auth-sso-switch { background:transparent; color:var(--muted); border:0; text-decoration:underline; font-size:12px; font-weight:500 }
 .auth-mode-sso .auth-card-foot { margin-top:20px }
@@ -2630,7 +2630,7 @@ main {
 }
 .auth-error:empty { display:none }
 .logout {
-  margin-top:17px;
+  margin-top:28px;
   color:#91aaa2!important;
   text-decoration:none;
   font-size:12px!important;
