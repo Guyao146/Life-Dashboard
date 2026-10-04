@@ -2595,3 +2595,205 @@ main {
 @media (prefers-reduced-motion:reduce) {
   .auth-sso-spinner { animation-duration:1.8s }
 }
+
+/* 柔光与微交互：颜色使用主题变量；入场只播放一次，不用持续动画装饰背景。 */
+:root {
+  --ui-ease:cubic-bezier(.22,1,.36,1);
+  --ui-glow:rgba(21,126,108,.08);
+  --ui-border:rgba(21,126,108,.16);
+  --ui-highlight:rgba(255,255,255,.85);
+  --ui-lift:0 14px 32px rgba(25,60,47,.1);
+  --ui-primary-end:#18816d;
+  --ui-action-ink:#116654
+}
+[data-theme="dark"] {
+  --ui-glow:rgba(56,176,146,.07);
+  --ui-border:rgba(105,199,171,.2);
+  --ui-highlight:rgba(255,255,255,.045);
+  --ui-lift:0 14px 32px rgba(0,0,0,.28);
+  --ui-primary-end:#50c9a7;
+  --ui-action-ink:#80dfc1
+}
+body {
+  background-image:radial-gradient(ellipse at 80% 0,var(--ui-glow),transparent 58%);
+  background-repeat:no-repeat
+}
+[data-theme="dark"] body {
+  background-image:radial-gradient(ellipse at 80% 0,var(--ui-glow),transparent 58%)
+}
+.auth-gate,
+[data-theme="dark"] .auth-gate {
+  background:radial-gradient(ellipse at 90% 15%,var(--ui-glow),transparent 55%),var(--bg)
+}
+.auth-panel { isolation:isolate }
+.auth-panel::before,
+.auth-panel::after {
+  content:'';
+  position:absolute;
+  width:480px;
+  height:480px;
+  border:1px solid rgba(255,255,255,.13);
+  border-radius:50%;
+  pointer-events:none;
+  z-index:-1
+}
+.auth-panel::before {
+  top:-250px;
+  right:-180px;
+  background:radial-gradient(circle,rgba(255,255,255,.14),transparent 68%)
+}
+.auth-panel::after { left:-320px; bottom:-150px; width:640px; height:640px }
+.auth-panel-chip {
+  border:1px solid rgba(255,255,255,.22);
+  box-shadow:inset 0 1px rgba(255,255,255,.2),0 14px 30px rgba(8,40,43,.16)
+}
+.auth-panel-name { letter-spacing:-.025em }
+.auth-panel-foot { flex-wrap:wrap; row-gap:8px; padding-top:32px }
+.auth-gate .auth-card {
+  position:relative;
+  width:min(440px,calc(100% - 48px));
+  margin:28px 0;
+  padding:38px 32px 30px;
+  border:1px solid var(--ui-border);
+  border-radius:26px;
+  background:linear-gradient(155deg,var(--ui-highlight),transparent 42%),var(--card);
+  box-shadow:0 24px 64px var(--ui-glow),inset 0 1px var(--ui-highlight)
+}
+.auth-card::before {
+  content:'';
+  position:absolute;
+  top:-1px;
+  left:22%;
+  right:22%;
+  height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  pointer-events:none
+}
+.auth-card h1 { font-size:26px; letter-spacing:-.04em }
+.auth-card-brand { margin-bottom:26px }
+.auth-card-mark { width:32px; height:32px }
+.auth-card-foot { border-top-style:solid; font-size:11px }
+.auth-field:focus-within label { color:var(--accent) }
+.auth-field label { transition:color .18s ease }
+.auth-field input { min-height:46px; border-radius:12px }
+.auth-card .auth-sso-continue { min-height:82px; border-radius:16px }
+.auth-card .auth-sso-switch { text-underline-offset:4px }
+.auth-sso-probe { background:var(--accent-soft); border-color:var(--ui-border) }
+.auth-error:not(:empty) {
+  padding:10px 12px;
+  border-radius:10px;
+  background:rgba(186,77,57,.08)
+}
+
+/* 卡片保持原布局，增强表面层次；不对整张卡片做悬浮位移，避免影响拖放和阅读。 */
+.grid > .card,
+.settings-card {
+  box-shadow:var(--shadow),inset 0 1px var(--ui-highlight);
+  transition:border-color .2s ease,box-shadow .25s ease
+}
+.card-head h2 { font-weight:600 }
+.view-intro .eyebrow { display:flex; align-items:center; gap:9px; font-size:10px; letter-spacing:.16em }
+.view-intro .eyebrow::before {
+  content:'';
+  width:18px;
+  height:2px;
+  border-radius:2px;
+  background:var(--accent)
+}
+.view-intro h2 { margin-top:12px; font-size:32px; font-weight:700 }
+.view-intro::after {
+  content:'';
+  display:block;
+  width:44px;
+  height:3px;
+  margin-top:22px;
+  border-radius:4px;
+  background:linear-gradient(90deg,var(--accent),var(--accent-soft))
+}
+.top .date { padding:7px 13px; border:1px solid var(--ui-border); border-radius:14px; background:var(--ui-glow); font-size:12px }
+#clock { font-family:'DM Mono',monospace; font-variant-numeric:tabular-nums; letter-spacing:.08em }
+.nav button.active { box-shadow:0 6px 18px var(--ui-glow),inset 0 0 0 1px var(--ui-border) }
+.nav .icon { transition:transform .22s var(--ui-ease) }
+.mobile-nav button { border-radius:12px; min-width:44px; transition:background-color .2s ease,color .2s ease }
+.mobile-nav button:not(.active) { color:var(--muted); font-weight:400 }
+.mobile-nav button.active { color:var(--accent); background:var(--accent-soft); font-weight:600 }
+.btn,
+.auth-card .btn,
+.quick-grid button,
+.more,
+.environment-slot,
+.theme-options button {
+  transition:transform .2s var(--ui-ease),box-shadow .2s ease,background-color .2s ease,border-color .2s ease,color .2s ease
+}
+.btn { border-radius:11px }
+.btn.primary,
+[data-theme="dark"] .btn.primary {
+  background-image:linear-gradient(125deg,var(--accent),var(--ui-primary-end));
+  box-shadow:0 5px 14px var(--ui-glow),inset 0 1px var(--ui-highlight)
+}
+.auth-card .btn.auth-oauth {
+  color:var(--ui-action-ink);
+  background:var(--accent-soft);
+  box-shadow:inset 0 0 0 1px var(--ui-border)
+}
+.auth-card .btn:hover { filter:none }
+:is(button,a,input,select,textarea,summary):focus-visible {
+  outline:2px solid var(--accent);
+  outline-offset:3px
+}
+.widget-toggle:has(input:focus-visible) { outline:2px solid var(--accent); outline-offset:3px }
+button:disabled { cursor:not-allowed }
+.modal-box { border:1px solid var(--ui-border) }
+.toast { max-width:min(420px,calc(100vw - 36px)); border:1px solid var(--ui-border); border-radius:14px; line-height:1.6 }
+.app-loader.hidden .loader-box,
+.app-loader.hidden .loader-box * { animation-play-state:paused }
+
+@media (hover:hover) and (pointer:fine) {
+  .grid > .card:not(.is-dragging):hover,
+  .settings-card:not(.is-dragging):hover { border-color:var(--ui-border); box-shadow:var(--ui-lift),inset 0 1px var(--ui-highlight) }
+  .btn:not(:disabled):hover,
+  .quick-grid button:not(:disabled):hover,
+  .environment-slot:hover { transform:translateY(-2px); box-shadow:var(--ui-lift) }
+  .btn.logout:hover { transform:none; box-shadow:none }
+  .nav button:hover .icon { transform:scale(1.12) }
+}
+:is(.btn,.quick-grid button,.more,.environment-slot,.theme-options button):not(:disabled):active { transform:scale(.98) }
+@media (prefers-reduced-motion:no-preference) {
+  .auth-card { animation:ui-rise .55s var(--ui-ease) both }
+  .auth-panel-chip,
+  .auth-panel-name,
+  .auth-panel-slogan,
+  .auth-points li { animation:ui-rise .65s var(--ui-ease) both }
+  .auth-panel-name { animation-delay:60ms }
+  .auth-panel-slogan { animation-delay:100ms }
+  .auth-points li:nth-child(1) { animation-delay:140ms }
+  .auth-points li:nth-child(2) { animation-delay:190ms }
+  .auth-points li:nth-child(3) { animation-delay:240ms }
+  .auth-manual:not([hidden]) { animation:ui-fade .25s ease both }
+  .modal.show { animation:ui-fade .18s ease both }
+  .modal.show .modal-box { animation:ui-rise .3s var(--ui-ease) both }
+}
+@keyframes ui-rise {
+  from { opacity:0; transform:translateY(14px) }
+  to { opacity:1; transform:translateY(0) }
+}
+@keyframes ui-fade { from { opacity:0 } to { opacity:1 } }
+@media (max-width:899px) {
+  .auth-gate .auth-card { width:min(440px,calc(100% - 32px)); padding:32px 26px }
+  .view-intro h2 { font-size:28px }
+  .view-intro::after { margin-top:14px; width:32px }
+  .toast { bottom:calc(82px + env(safe-area-inset-bottom)) }
+}
+@media (max-width:520px) {
+  .auth-gate .auth-card { padding:28px 22px; border-radius:22px; margin:20px 0 }
+  .auth-card h1 { font-size:24px }
+  .auth-card .auth-oauth { font-size:12px }
+  .auth-sso-copy b { white-space:normal; overflow-wrap:anywhere; font-size:13px }
+}
+/* 包含原有 CSS 动画，确保用户在系统中停用动效后不再出现旋转或位移。 */
+@media (prefers-reduced-motion:reduce) {
+  *,*::before,*::after { animation:none!important; transition:none!important; scroll-behavior:auto!important }
+  .btn:hover,.btn:active,.nav button:hover,.nav button:hover .icon,
+  .quick-grid button:hover,.quick-grid button:active,.scene-item:hover,
+  .environment-slot:hover,.environment-slot:active,.more:active,.theme-options button:active { transform:none!important }
+}
