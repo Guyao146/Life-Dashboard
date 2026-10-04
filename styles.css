@@ -1751,6 +1751,22 @@ main {
 .version-license b { color:var(--ink); font-weight:500 }
 .version-license a { color:var(--accent); text-decoration:none }
 .version-license a:hover { text-decoration:underline }
+.settings-about { display:grid; gap:13px; margin:0 }
+.about-heading { display:flex; align-items:center; gap:10px }
+.about-heading>span:last-child { display:grid; gap:3px }
+.about-heading small { color:var(--muted); font-size:10px; letter-spacing:.06em; text-transform:uppercase }
+.about-heading b { color:var(--ink); font-size:13px }
+.about-mark { display:grid; place-items:center; width:34px; height:34px; border-radius:11px; background:var(--accent-soft); color:var(--accent); font-size:17px }
+.about-intro { margin:0; color:var(--muted); font-size:12px; line-height:1.7 }
+.about-links { display:grid; gap:8px; margin:0; padding:0; list-style:none }
+.about-links a { display:flex; align-items:center; justify-content:space-between; padding:11px 13px; border:1px solid #e8eeea; border-radius:12px; color:var(--ink); font-size:12px; text-decoration:none }
+.about-links a:hover { border-color:var(--accent); background:var(--accent-soft) }
+.about-links a:after { content:'↗'; color:var(--muted); font-size:13px }
+.about-license { margin:0; padding:10px 13px; border:1px solid #e8eeea; border-radius:12px; background:var(--accent-soft); color:var(--muted); font-size:11px; line-height:1.7 }
+.about-license b { color:var(--ink); font-weight:500 }
+.about-license a { color:var(--accent); text-decoration:none }
+.about-license a:hover { text-decoration:underline }
+.about-note { margin:0; color:var(--muted); font-size:11px; line-height:1.6 }
 .btn.danger { color:#b64d3d; background:#fff0ed }
 .grid.is-hidden { display:none }
 
@@ -2312,6 +2328,10 @@ main {
 [data-theme="dark"] .settings-card.settings-version {
   background:linear-gradient(135deg,#16201c,#101815)
 }
+[data-theme="dark"] .settings-card.settings-about { background:linear-gradient(135deg,#16201c,#101815) }
+[data-theme="dark"] .about-links a { background:#101815; border-color:#26312b }
+[data-theme="dark"] .about-links a:hover { background:#141d18; border-color:#2f4a41 }
+[data-theme="dark"] .about-license { border-color:#26312b }
 
 [data-theme="dark"] .environment-sensor-group,
 [data-theme="dark"] .device-group {
