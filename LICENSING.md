@@ -8,7 +8,7 @@
 | 权利主体 | 版权归属以 Git 提交记录为准；全部提交由 Guyao146（guxuan.mojang@outlook.com / 61780021+Guyao146@users.noreply.github.com）作出，未接收需另行授权的外部贡献 |
 | 适用范围 | 仓库自有内容：`index.html`、`app.js`、`styles.css`、`assets/`、`config.php`、`update.php`、`upgrade.html`、`version.js`、`scripts/`、`.env.example`、`nginx-life-dashboard.conf.example`、`README.md`、`CHANGELOG.md`、`LICENSE`、`LICENSING.md` |
 | 排除项 | 经 Google Fonts 加载的 Noto Sans SC 与 DM Mono 网络字体（字体各自许可）；运行环境与外部服务（PHP 8.2、Nginx/Apache、Home Assistant、Authentik、Open-Meteo、AI 接口等）不受本许可约束 |
-| 固定版本 | Sakura-License v1.2 正式固定正文（文本标识 `Sakura-License-1.2`，2026-10-04 发布）；正文为仓库根 `LICENSE`，SHA-256 `e6907caa49a1ef3935fbb4665f4453bf1c3e1606b735ce793fd314dc05082402`，与本 Wiki [固定正文](https://wiki.mcylyr.cn/#/../licenses/Sakura-License-1.2) 逐字一致 |
+| 固定版本 | Sakura-License v1.2 正式固定正文（文本标识 `Sakura-License-1.2`，2026-10-04 发布）；正文为仓库根 `LICENSE`，LF 行尾副本的 SHA-256 `e6907caa49a1ef3935fbb4665f4453bf1c3e1606b735ce793fd314dc05082402`，与本 Wiki [固定正文](https://wiki.mcylyr.cn/#/../licenses/Sakura-License-1.2) 逐字一致 |
 | 生效边界 | 自项目版本 `1.0.14`（首次同时包含本声明与该 `LICENSE` 的提交）起，对本项目后续提交与发布版本生效 |
 | 历史权利 | `1.0.13` 及此前全部发布版本仍按 `LGPL-2.1` 授权；接收者使用、修改和再分发的权利不因本次更换而撤销 |
 | 第三方内容 | 本仓库无捆绑的第三方代码依赖；网络字体与外部服务按「排除项」保留各自许可 |
