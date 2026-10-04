@@ -207,3 +207,12 @@ JSON.stringify({ salt: e(s), hash: e(new Uint8Array(b)), iterations: 310000 });
 
 ---
 
+## 许可证
+
+自 `1.0.14` 起，Life Dashboard 采用 [Sakura-License v1.2](LICENSE)（正式固定正文，文本标识 `Sakura-License-1.2`，2026-10-04 发布）：
+
+- 完整许可正文见仓库根 [`LICENSE`](LICENSE)；适用范围、权利主体、生效版本等采用声明见 [`LICENSING.md`](LICENSING.md)。
+- Sakura-License 是源码可用（source-available）许可证：源码公开、衍生作品须以相同版本共享、保留署名并公开对应源码，但**特定商用需事先取得书面授权**。个人学习、日常使用、教育和非营利用途不受影响。
+- `1.0.13` 及更早版本仍按 `LGPL-2.1` 授权；已取得的 LGPL 权利不因本次迁移撤销。
+- 商用授权与法律通知入口：[GitHub Issues](https://github.com/Guyao146/Life-Dashboard/issues)。
+

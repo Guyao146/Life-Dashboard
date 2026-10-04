@@ -1747,6 +1747,10 @@ main {
 .version-status { min-height:16px; color:var(--muted); font-size:11px }
 .version-status:before { content:'●'; color:var(--accent); margin-right:5px }
 .version-actions button:disabled { cursor:wait; opacity:.65 }
+.version-license { color:var(--muted); font-size:11px }
+.version-license b { color:var(--ink); font-weight:500 }
+.version-license a { color:var(--accent); text-decoration:none }
+.version-license a:hover { text-decoration:underline }
 .btn.danger { color:#b64d3d; background:#fff0ed }
 .grid.is-hidden { display:none }
 
