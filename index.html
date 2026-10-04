@@ -15,20 +15,22 @@
 <body>
   <div class="app-loader hidden" id="app-loader" aria-live="polite" aria-busy="false"><div class="loader-box"><div class="loader-mark"><svg class="loader-arc" viewBox="0 0 76 76" aria-hidden="true"><circle cx="38" cy="38" r="34"></circle></svg><span class="logo loader-logo" aria-hidden="true"></span></div><b class="loader-greeting" id="loader-greeting" hidden></b><b id="loader-title">正在加载你的生活中枢</b><span id="loader-detail">正在准备安全连接…</span></div></div>
   <section class="auth-gate" id="auth-gate">
-    <div class="auth-panel">
-      <div class="auth-brand"><span class="logo"></span>生活中枢</div>
-      <div class="auth-copy">
-        <h2 class="auth-headline">家、日程与健康，<br>汇入同一块看板。</h2>
+    <aside class="auth-panel">
+      <svg class="auth-panel-deco" viewBox="0 0 64 64" aria-hidden="true"><mask id="life-mask-deco"><rect width="64" height="64" fill="#fff"/><circle cx="32" cy="32" r="12" fill="none" stroke="#000" stroke-width="5"/></mask><rect width="64" height="64" rx="18" fill="currentColor" mask="url(#life-mask-deco)"/></svg>
+      <div class="auth-panel-body">
+        <span class="auth-panel-chip"><svg class="auth-panel-mark" viewBox="0 0 64 64" aria-hidden="true"><mask id="life-mask-chip"><rect width="64" height="64" fill="#fff"/><circle cx="32" cy="32" r="12" fill="none" stroke="#000" stroke-width="5"/></mask><rect width="64" height="64" rx="18" fill="currentColor" mask="url(#life-mask-chip)"/></svg></span>
+        <h2 class="auth-panel-name">生活中枢</h2>
+        <p class="auth-panel-slogan">家、日程与健康，汇入同一块看板。</p>
         <ul class="auth-points">
-          <li><span class="pt-icon">⌁</span>家庭环境与设备状态实时同步</li>
-          <li><span class="pt-icon">◷</span>今天的安排、待办与配送进度</li>
-          <li><span class="pt-icon">◉</span>习惯与能耗，看见每天的累积</li>
+          <li><span class="pt-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.7V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.7"/></svg></span><span class="pt-copy"><b>家庭环境实时同步</b><small>温湿度、空气质量与设备状态尽在看板</small></span></li>
+          <li><span class="pt-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 2.8v4M16 2.8v4"/></svg></span><span class="pt-copy"><b>今天的安排与待办</b><small>日程、待办与配送进度随时掌握</small></span></li>
+          <li><span class="pt-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2.5-6.5L14 18l2.5-6H21"/></svg></span><span class="pt-copy"><b>习惯与能耗</b><small>看见每一天的坚持与累积</small></span></li>
         </ul>
       </div>
       <div class="auth-panel-foot"><span class="auth-mono">OIDC · PKCE</span>由 樱落怡然验证服务 提供统一登录</div>
-    </div>
+    </aside>
     <div class="auth-card">
-      <div class="auth-card-brand"><span class="logo"></span><span>PERSONAL LIFE OS</span></div>
+      <div class="auth-card-brand"><svg class="auth-card-mark" viewBox="0 0 64 64" aria-hidden="true"><mask id="life-mask-card"><rect width="64" height="64" fill="#fff"/><circle cx="32" cy="32" r="12" fill="none" stroke="#000" stroke-width="5"/></mask><rect width="64" height="64" rx="18" fill="currentColor" mask="url(#life-mask-card)"/></svg><span class="auth-card-kicker">PERSONAL LIFE OS</span><b class="auth-card-name">生活中枢</b></div>
       <h1>欢迎回来</h1>
       <p>登录后即可进入你的个人生活看板</p>
       <div class="auth-sso" id="auth-sso" hidden></div>

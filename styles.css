@@ -1312,14 +1312,15 @@ main {
   transform:none
 }
 
-/* 登录页：左侧品牌介绍栏 + 右侧登录卡片，与主界面的绿色视觉保持一致。 */
+/* 登录页：樱落设计语言 —— 桌面 ≥900px 左侧整高品牌渐变面板 + 右侧居中表单列。
+   认证逻辑零改动：#auth-gate、表单字段与错误区域的选择器全部保持原样。 */
 .auth-gate {
   position:fixed;
   inset:0;
   z-index:100;
-  background:var(--bg);
   display:grid;
   grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);
+  background:var(--bg);
   overflow:auto
 }
 
@@ -1327,101 +1328,125 @@ main {
   display:none
 }
 
+/* 品牌面板：渐变自持，不随日间/夜间主题切换；C1=项目强调色，C2=紫罗兰变体 */
 .auth-panel {
+  --auth-c1:#157e6c;
+  --auth-cm:#1d5f9e;
+  --auth-c2:#7c3aed;
   position:relative;
-  padding:44px 52px;
-  background:linear-gradient(160deg,#0e2b25,#157e6c 135%);
-  color:#eaf4f0;
   display:flex;
   flex-direction:column;
-  gap:28px;
+  padding:64px 48px 24px;
+  background:linear-gradient(150deg,var(--auth-c1) 0%,var(--auth-cm) 45%,var(--auth-c2) 100%);
+  color:#fff;
   overflow:hidden
 }
 
-.auth-panel:before,
-.auth-panel:after {
-  content:'';
+/* 右下角 260px 同款标志装饰，溢出面板边缘 */
+.auth-panel-deco {
   position:absolute;
-  border:1px solid rgba(255,255,255,.14);
-  border-radius:50%;
+  right:-64px;
+  bottom:-64px;
+  width:260px;
+  height:260px;
+  color:#fff;
+  opacity:.12;
   pointer-events:none
 }
 
-.auth-panel:before {
-  width:340px;
-  height:340px;
-  right:-120px;
-  bottom:-140px
-}
-
-.auth-panel:after {
-  width:180px;
-  height:180px;
-  right:120px;
-  bottom:-90px;
-  border-color:rgba(255,255,255,.1)
-}
-
-.auth-brand {
-  display:flex;
-  gap:10px;
-  align-items:center;
-  font-weight:700;
-  font-size:17px;
-  position:relative
-}
-
-.auth-panel .logo {
-  background:rgba(255,255,255,.16)
-}
-
-.auth-copy {
+.auth-panel-body {
+  position:relative;
   margin:auto 0;
-  max-width:430px;
-  position:relative
+  max-width:430px
 }
 
-.auth-headline {
-  font-size:30px;
-  line-height:1.5;
-  letter-spacing:.02em;
-  margin:0 0 20px
+.auth-panel-chip {
+  display:grid;
+  place-items:center;
+  width:72px;
+  height:72px;
+  border-radius:22px;
+  background:rgba(255,255,255,.15)
+}
+
+.auth-panel-chip .auth-panel-mark {
+  width:40px;
+  height:40px;
+  color:#fff
+}
+
+.auth-panel-name {
+  margin:24px 0 0;
+  font-size:2.1rem;
+  font-weight:700;
+  line-height:1.25;
+  letter-spacing:.02em
+}
+
+.auth-panel-slogan {
+  margin:10px 0 0;
+  font-size:15px;
+  line-height:1.75;
+  color:rgba(255,255,255,.85)
 }
 
 .auth-points {
   list-style:none;
-  margin:0;
+  margin:40px 0 0;
   padding:0;
   display:grid;
-  gap:12px;
-  font-size:13.5px;
-  color:#cfe3dc
+  gap:20px
 }
 
 .auth-points li {
   display:flex;
-  gap:12px;
+  gap:14px;
   align-items:center
 }
 
 .pt-icon {
-  width:32px;
-  height:32px;
-  border-radius:10px;
-  background:rgba(255,255,255,.12);
+  width:34px;
+  height:34px;
+  border-radius:11px;
+  background:rgba(255,255,255,.15);
   display:grid;
   place-items:center;
   flex:none;
-  font-size:14px
+  color:#fff
+}
+
+.pt-icon svg {
+  width:17px;
+  height:17px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round
+}
+
+.pt-copy b {
+  display:block;
+  font-size:14px;
+  font-weight:600;
+  line-height:1.4
+}
+
+.pt-copy small {
+  display:block;
+  margin-top:3px;
+  font-size:13px;
+  line-height:1.5;
+  color:rgba(255,255,255,.7)
 }
 
 .auth-panel-foot {
   position:relative;
-  font-size:12px;
-  color:#a8c6bd;
   display:flex;
   gap:10px;
-  align-items:center
+  align-items:center;
+  font-size:12px;
+  color:rgba(255,255,255,.6)
 }
 
 .auth-mono {
@@ -1429,40 +1454,56 @@ main {
   font-size:11px;
   letter-spacing:.06em;
   padding:3px 9px;
-  border:1px solid rgba(255,255,255,.22);
+  border:1px solid rgba(255,255,255,.25);
   border-radius:99px;
-  color:#dff0ea
+  color:rgba(255,255,255,.85)
 }
 
+/* 表单面板：内容列 420px 居中，颜色走项目 token，日夜主题自动协调 */
 .auth-card {
   align-self:center;
   justify-self:center;
-  width:min(392px,100%);
-  margin:22px;
-  padding:36px 32px;
-  background:var(--card);
-  border:1px solid #e5ebe6;
-  border-radius:22px;
-  box-shadow:0 20px 60px rgba(28,46,39,.12);
+  width:min(420px,100%);
+  padding:36px 28px;
+  background:transparent;
+  border:0;
+  box-shadow:none;
   text-align:center
 }
 
-.auth-card .logo {
-  margin:0 auto 18px;
-  width:46px;
-  height:46px;
-  border-radius:14px
+.auth-card-brand {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  margin-bottom:24px;
+  color:var(--muted);
+  font:500 10px 'DM Mono',monospace;
+  letter-spacing:.16em
 }
 
-.auth-card .logo:after {
-  width:18px;
-  height:18px;
-  top:12px;
-  left:12px
+.auth-card-mark {
+  width:28px;
+  height:28px;
+  color:var(--accent)
+}
+
+/* 桌面端显示英文眉题；窄屏切换为紧凑品牌行（产品名） */
+.auth-card-kicker {
+  display:inline
+}
+
+.auth-card-name {
+  display:none;
+  font:700 15px 'Noto Sans SC',sans-serif;
+  letter-spacing:.04em;
+  color:var(--ink)
 }
 
 .auth-card h1 {
-  font-size:23px;
+  color:var(--ink);
+  font-size:20px;
+  font-weight:700;
   margin:0 0 8px
 }
 
@@ -1477,7 +1518,12 @@ main {
   width:100%;
   font-weight:600;
   padding:12px 14px;
-  font-size:14px
+  font-size:14px;
+  transition:filter .18s ease,box-shadow .18s ease,opacity .18s ease,transform .18s ease
+}
+
+.auth-card .btn:hover {
+  filter:brightness(1.06)
 }
 
 .auth-form {
@@ -1503,17 +1549,17 @@ main {
   padding:11px 13px;
   border:1px solid var(--line);
   border-radius:10px;
-  background:#fbfcfb;
+  background:var(--card);
   font:inherit;
   color:var(--ink);
   outline:none;
-  transition:border-color .15s,box-shadow .15s,background .15s
+  transition:border-color .15s ease,box-shadow .15s ease,background .15s ease
 }
 
 .auth-field input:focus {
   border-color:var(--accent);
-  background:#fff;
-  box-shadow:0 0 0 3px rgba(21,126,108,.13)
+  background:var(--card);
+  box-shadow:0 0 0 3px var(--accent-soft)
 }
 
 .auth-submit {
@@ -1521,6 +1567,11 @@ main {
 }
 
 #auth-submit:disabled {
+  cursor:not-allowed;
+  opacity:.58
+}
+
+#auth-login:disabled {
   cursor:not-allowed;
   opacity:.58
 }
@@ -1542,24 +1593,28 @@ main {
   background:var(--line)
 }
 
+.logout {
+  margin-top:9px;
+  background:transparent!important;
+  color:var(--muted)!important;
+  text-decoration:underline
+}
+
+.logout:hover {
+  color:var(--ink)!important
+}
+
 .auth-error {
   color:#ba4d39;
   font-size:12px;
   margin-top:14px;
   min-height:18px;
-  line-height:1.6
+  line-height:1.6;
+  text-align:left
 }
 
-#auth-login:disabled {
-  cursor:not-allowed;
-  opacity:.58
-}
-
-.logout {
-  margin-top:9px;
-  background:transparent!important;
-  color:#6c7671!important;
-  text-decoration:underline
+[data-theme="dark"] .auth-error {
+  color:#ed8d7e
 }
 
 .auth-card-foot {
@@ -1576,16 +1631,15 @@ main {
 .auth-sso[hidden] { display:none }
 .auth-mode-sso .auth-card > p { margin-bottom:20px }
 .auth-mode-sso .auth-sso { margin:0; gap:16px }
-.auth-mode-sso .auth-sso-continue { min-height:76px; border-radius:14px; box-shadow:0 10px 24px rgba(21,126,108,.16) }
+.auth-mode-sso .auth-sso-continue { min-height:76px; border-radius:14px }
 .auth-mode-sso .auth-sso-switch { background:transparent; color:var(--muted); border:0; text-decoration:underline; font-size:12px; font-weight:500 }
-.auth-mode-sso .auth-card-foot { margin-top:20px }
 .auth-sso-empty { display:grid; gap:6px; padding:14px 0 4px; color:var(--muted); font-size:12px; line-height:1.6 }
 .auth-sso-empty button { justify-self:start; padding:0; border:0; background:transparent; color:var(--accent); font:inherit; cursor:pointer; text-decoration:underline }
 
-@media (max-width:900px) {
+/* 窄屏 ≤899px：品牌面板隐藏，表单列展示紧凑品牌行 */
+@media (max-width:899px) {
   .auth-gate {
-    grid-template-columns:1fr;
-    place-items:center
+    grid-template-columns:1fr
   }
 
   .auth-panel {
@@ -1593,14 +1647,21 @@ main {
   }
 
   .auth-card {
-    margin:0
+    padding:32px 20px
+  }
+
+  .auth-card-kicker {
+    display:none
+  }
+
+  .auth-card-name {
+    display:inline
   }
 }
 
 @media (max-width:520px) {
-  .auth-gate { padding:14px }
-  .auth-card { width:100%; margin:0; padding:30px 22px; border-radius:18px }
-  .auth-card h1 { font-size:22px }
+  .auth-card { width:100%; padding:26px 6px }
+  .auth-card h1 { font-size:19px }
   .auth-card .btn { min-height:46px }
 }
 
@@ -2501,98 +2562,7 @@ main {
 [data-theme="dark"] .auth-sso-avatar{background:rgba(255,255,255,.14)}
 @media(prefers-reduced-motion:reduce){.auth-sso{animation:none}}
 
-/* 登录页视觉升级：保持认证逻辑不变，只增强品牌层级、层次与反馈状态。 */
-.auth-gate {
-  background:
-    radial-gradient(circle at 12% 18%, rgba(46,170,146,.12), transparent 28%),
-    radial-gradient(circle at 88% 82%, rgba(67,111,145,.1), transparent 30%),
-    #0b1110;
-}
-.auth-gate:before,
-.auth-gate:after {
-  content:'';
-  position:fixed;
-  pointer-events:none;
-  border:1px solid rgba(120,210,188,.08);
-  border-radius:50%;
-}
-.auth-gate:before { width:52vw; height:52vw; left:-25vw; top:-25vw }
-.auth-gate:after { width:42vw; height:42vw; right:-20vw; bottom:-22vw }
-.auth-panel {
-  background:linear-gradient(155deg,rgba(17,47,40,.88),rgba(12,26,23,.94));
-  border-right:1px solid rgba(139,220,198,.12);
-}
-.auth-card {
-  position:relative;
-  width:min(430px,calc(100% - 32px));
-  margin:16px;
-  padding:38px 36px 30px;
-  background:rgba(19,29,26,.88);
-  border:1px solid rgba(160,211,197,.16);
-  border-radius:26px;
-  box-shadow:0 30px 90px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.035);
-  backdrop-filter:blur(18px);
-}
-.auth-card:before {
-  content:'';
-  position:absolute;
-  inset:0 18% auto 18%;
-  height:1px;
-  background:linear-gradient(90deg,transparent,rgba(95,210,183,.65),transparent);
-}
-.auth-card-brand {
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:9px;
-  margin-bottom:27px;
-  color:#7da399;
-  font:500 10px 'DM Mono',monospace;
-  letter-spacing:.16em;
-}
-.auth-card-brand .logo {
-  width:28px;
-  height:28px;
-  border-radius:9px;
-  margin:0;
-  box-shadow:0 5px 18px rgba(35,182,155,.22);
-}
-.auth-card-brand .logo:after { width:12px; height:12px; top:8px; left:8px }
-.auth-card h1 {
-  color:#f1f7f4;
-  font-size:26px;
-  letter-spacing:.02em;
-  margin-bottom:9px;
-}
-.auth-card p { color:#8fa7a0; margin-bottom:27px }
-.auth-card .auth-sso-continue {
-  min-height:76px;
-  background:linear-gradient(135deg,#1c8f7c,#176d60);
-  border:1px solid rgba(130,237,211,.2);
-  border-radius:16px;
-  box-shadow:0 14px 28px rgba(5,83,68,.28), inset 0 1px 0 rgba(255,255,255,.12);
-  transition:transform .18s,box-shadow .18s,filter .18s;
-}
-.auth-card .auth-sso-continue:hover {
-  transform:translateY(-2px);
-  filter:saturate(1.08);
-  box-shadow:0 18px 34px rgba(5,83,68,.36), inset 0 1px 0 rgba(255,255,255,.15);
-}
-.auth-sso-avatar {
-  width:42px;
-  height:42px;
-  border:1px solid rgba(255,255,255,.24);
-  background:rgba(4,48,41,.28);
-  color:#e5fff8;
-}
-.auth-sso-copy small { color:#bce5da; font-size:10px }
-.auth-sso-copy b { color:#fff; font-size:15px }
-.auth-card .auth-sso-switch {
-  color:#8db1a7;
-  padding:10px 12px 4px;
-  text-decoration:none;
-}
-.auth-card .auth-sso-switch:hover { color:#c8eee4 }
+/* 静默 SSO 探测态：颜色走项目 token，日夜主题自动协调 */
 .auth-sso-probe {
   display:grid;
   grid-template-columns:42px minmax(0,1fr);
@@ -2600,58 +2570,28 @@ main {
   gap:12px;
   min-height:76px;
   padding:15px 16px;
-  border:1px solid rgba(119,196,178,.18);
-  border-radius:16px;
-  background:rgba(33,67,58,.48);
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--card);
   text-align:left;
 }
 .auth-sso-probe .auth-sso-copy { gap:4px }
-.auth-sso-probe small { color:#9dc2b8; font-size:10px }
-.auth-sso-probe b { color:#e2f4ef; font-size:14px; font-weight:600 }
+.auth-sso-probe small { color:var(--muted); font-size:10px }
+.auth-sso-probe b { color:var(--ink); font-size:14px; font-weight:600 }
 .auth-sso-spinner {
   width:30px;
   height:30px;
   margin:6px;
-  border:2px solid rgba(151,224,207,.2);
-  border-top-color:#55cbb1;
+  border:2px solid var(--line);
+  border-top-color:var(--accent);
   border-radius:50%;
   animation:auth-sso-spin .8s linear infinite;
 }
 @keyframes auth-sso-spin { to { transform:rotate(360deg) } }
-.auth-error {
-  min-height:0;
-  margin-top:16px;
-  padding:10px 12px;
-  border:1px solid rgba(222,104,88,.22);
-  border-radius:11px;
-  background:rgba(123,43,36,.18);
-  color:#ed8d7e;
-  text-align:left;
-}
-.auth-error:empty { display:none }
-.logout {
-  margin-top:28px;
-  color:#91aaa2!important;
-  text-decoration:none;
-  font-size:12px!important;
-}
-.logout:hover { color:#d1eee7!important; background:rgba(255,255,255,.045)!important }
-.auth-card-foot {
-  margin-top:22px;
-  padding-top:18px;
-  border-top:1px solid rgba(137,183,171,.13);
-  color:#718b83;
-  line-height:1.75;
-}
-@media (max-width:900px) {
-  .auth-gate { background-color:#0b1110 }
-  .auth-card { width:min(430px,calc(100% - 28px)); margin:14px }
-}
-@media (max-width:520px) {
-  .auth-card { padding:31px 22px 25px; border-radius:22px }
-  .auth-card-brand { margin-bottom:23px }
-  .auth-card h1 { font-size:24px }
-}
+
+/* 夜间主题：表单面板是透明内容列，抵消通用弹窗卡片的深色底 */
+[data-theme="dark"] .auth-card { background:transparent; border:0; box-shadow:none }
+
 @media (prefers-reduced-motion:reduce) {
   .auth-sso-spinner { animation-duration:1.8s }
 }
