@@ -59,6 +59,53 @@ git clone https://github.com/Guyao146/Life-Dashboard.git
 
 ---
 
+## Docker / GHCR 部署
+
+从 `v1.0.17` 起提供 `linux/amd64` 和 `linux/arm64` 镜像：
+
+```text
+ghcr.io/guyao146/life-dashboard:1.0.17
+```
+
+镜像同时提供 `v1.0.17` 和 `latest` 标签。生产部署建议固定版本；镜像、Git 标签、页面版本号与 Release ZIP 对应同一份源码。
+
+下载仓库中的 `compose.yml` 和 `.env.example`，或在克隆后的目录执行：
+
+```bash
+cp .env.example .env
+# 按下文「配置修改」填写 OIDC、管理员白名单、HA 和 DSH 配置。
+# Linux 主机需允许容器中的 www-data（GID 33）读取该文件：
+sudo chown root:33 .env
+sudo chmod 640 .env
+docker compose pull
+docker compose up -d
+docker compose ps
+```
+
+- 默认只监听主机 `127.0.0.1:8080`，通过主机 Nginx / Apache 反向代理到该端口并配置 HTTPS；保留原始 `Host` 和 `Authorization` 请求头。Authentik 回调地址应使用外部 HTTPS 域名。
+- `.env` **必须预先存在**，只读挂载到 `/run/secrets/life-dashboard.env`，不会进入镜像或 Web 根目录。仅使用 `--env-file` 不能代替配置文件挂载。Windows / Docker Desktop 请用主机文件权限限制访问，无需执行上面的 `chown`。
+- `dashboard-data` 卷保存 DSH 快照、待执行命令、配对状态和版本检查缓存；重建容器时保留该卷，**不要执行 `docker compose down -v`**。浏览器布局、主题等偏好仍保存在原浏览器中，迁移时应保留访问域名。
+- Apache 已禁用目录列表、隐藏文件和旧 `config.js` 的 Web 访问。镜像包含许可正文与采用声明；PHP / Apache / Debian 等基础组件保留各自许可。
+- 健康检查验证 HTTP 服务可用，不代表 OIDC 或 Home Assistant 已配置正确；启动后仍需验证实际管理员登录。
+
+升级时，将 `compose.yml` 中镜像标签改为目标版本，再执行：
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+容器部署不支持网页内覆盖升级，页面会提示使用上述方式；非容器部署的一键升级不受影响。使用 `latest` 时无需修改标签，但仍需拉取并重建。
+
+本地构建及运行冒烟测试（需要 Docker 和 Node.js 22 或更新版本）：
+
+```bash
+docker build -t life-dashboard:test .
+node scripts/check_container.cjs life-dashboard:test
+```
+
+推送 `vX.Y.Z` 标签后，GitHub Actions 会先校验发布信息、构建并测试两个架构，再发布 GHCR 镜像和 GitHub Release ZIP / SHA-256。首次发布 GHCR 包后，维护者需在包设置中确认可见性为 Public，才能匿名拉取。
+
 ## 配置修改
 
 复制 `.env.example` 为服务器私密配置：

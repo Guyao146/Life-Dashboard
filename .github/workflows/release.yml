@@ -6,12 +6,95 @@ name: Publish release
       - 'v*'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  validate:
+    name: Validate release metadata
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate PHP and JavaScript
+        run: |
+          php -l config.php && php -l update.php && php -l scripts/bump_version.php && php -l scripts/check_version.php
+          node --check app.js && node --check version.js && node --check scripts/check_container.cjs
+          php scripts/check_version.php --base HEAD^
+      - name: Match tag, page and Compose versions
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const version = fs.readFileSync('version.js', 'utf8').match(/version:\s*'([^']+)'/)[1];
+          assert.equal(process.env.GITHUB_REF_NAME, `v${version}`);
+          assert.ok(fs.readFileSync('compose.yml', 'utf8').includes(`ghcr.io/guyao146/life-dashboard:${version}\n`));
+          NODE
+
+  container-check:
+    needs: validate
+    uses: ./.github/workflows/container-check.yml
+
+  publish-image:
+    name: Publish GHCR image
+    needs: container-check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/guyao146/life-dashboard
+          tags: |
+            type=semver,pattern={{version}}
+            type=ref,event=tag
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.licenses=LicenseRef-Sakura-License-1.2
+      - name: Build and push both architectures
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: |
+            type=gha,scope=amd64
+            type=gha,scope=arm64
+      - name: Verify published manifest
+        env:
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: docker buildx imagetools inspect "ghcr.io/guyao146/life-dashboard@${IMAGE_DIGEST}"
+
   package-and-release:
     name: Package and publish ${{ github.ref_name }}
+    needs: publish-image
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Check out release tag
         uses: actions/checkout@v4
@@ -30,11 +113,20 @@ jobs:
             "${GITHUB_REF_NAME}" \
             -o "${archive}"
           sha256sum "${archive}" > "${archive}.sha256"
+          sha256sum --check "${archive}.sha256"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          fail_on_unmatched_files: true
+          body: |
+            ## Docker / GHCR
+            `ghcr.io/guyao146/life-dashboard:${{ github.ref_name }}`（linux/amd64、linux/arm64）
+
+            镜像摘要：`${{ needs.publish-image.outputs.digest }}`
+
+            支持纯数字版本标签及 `latest`；部署与升级方式见 README 的 Docker / GHCR 章节。
           files: |
             Life-Dashboard-v*.zip
             Life-Dashboard-v*.zip.sha256

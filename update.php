@@ -413,6 +413,11 @@ if (!in_array($command, ['check', 'update', 'update-stream'], true)) {
 
 if ($command === 'update' || $command === 'update-stream') {
     $streamRequest = $command === 'update-stream';
+    if (getenv('LIFE_HUB_CONTAINER') === '1') {
+        $message = '容器部署请拉取新镜像并重建容器（docker compose pull && docker compose up -d），不支持网页内覆盖升级';
+        if ($streamRequest) { beginUpdateStream(); sendUpdateEvent('error', 'error', $message); exit; }
+        respond(409, ['ok' => false, 'error' => $message]);
+    }
     try {
         $claims = fetchUserInfo(updateEnv('LIFE_HUB_OIDC_USERINFO_URL'), requestAuthToken());
     } catch (Throwable $error) {

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 const VERSION_PATTERN = "/version:\\s*'([^']+)'/";
 const RELEASE_DATE_PATTERN = "/releasedAt:\\s*'(\\d{4}-\\d{2}-\\d{2})'/";
-const PRODUCT_FILES = ['index.html', 'app.js', 'styles.css', 'config.php', '.env.example'];
+const PRODUCT_FILES = ['index.html', 'upgrade.html', 'app.js', 'styles.css', 'config.php', 'update.php', '.env.example', 'Dockerfile', '.dockerignore', 'compose.yml', 'docker/apache.conf', 'docker/php.ini'];
 
 $root = dirname(__DIR__);
 $versionFile = $root . DIRECTORY_SEPARATOR . 'version.js';

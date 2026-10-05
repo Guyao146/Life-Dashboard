@@ -1,0 +1,17 @@
+services:
+  dashboard:
+    image: ghcr.io/guyao146/life-dashboard:1.0.17
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - type: bind
+        source: ./.env
+        target: /run/secrets/life-dashboard.env
+        read_only: true
+        bind:
+          create_host_path: false
+      - dashboard-data:/var/lib/life-dashboard
+
+volumes:
+  dashboard-data:

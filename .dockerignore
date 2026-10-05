@@ -1,0 +1,18 @@
+# Only runtime files and build configuration enter the build context.
+*
+!Dockerfile
+!.dockerignore
+!docker/
+!docker/apache.conf
+!docker/php.ini
+!index.html
+!upgrade.html
+!app.js
+!styles.css
+!version.js
+!config.php
+!update.php
+!LICENSE
+!LICENSING.md
+!assets/
+!assets/life.svg

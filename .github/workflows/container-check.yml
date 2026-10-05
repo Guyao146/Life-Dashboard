@@ -1,0 +1,51 @@
+name: Container check
+
+'on':
+  workflow_call:
+  pull_request:
+  push:
+    branches: [main, 'release/**']
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    name: Build and test ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+      - name: Validate PHP and release metadata
+        run: |
+          php -l config.php && php -l update.php && php -l scripts/bump_version.php && php -l scripts/check_version.php
+          php scripts/check_version.php --base HEAD^
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Build test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: life-dashboard:test
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+      - name: Verify container behavior
+        run: node scripts/check_container.cjs life-dashboard:test
