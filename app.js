@@ -591,8 +591,96 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     const aiConfigKey='life-hub-ai-config';
     let aiHistory=[];
     function aiConfig(){try{const cfg=JSON.parse(localStorage.getItem(aiConfigKey)||'null');return cfg&&cfg.baseUrl&&cfg.apiKey&&cfg.model?cfg:null}catch(err){localStorage.removeItem(aiConfigKey);return null}}
-    function updateAiLabel(){const cfg=aiConfig();$('#ai-model-label').textContent=cfg?.model||'未配置模型';$('#ai-dot').classList.toggle('ok',Boolean(cfg))}
-    function syncAiSettings(){const raw=(()=>{try{return JSON.parse(localStorage.getItem(aiConfigKey)||'null')||{}}catch(err){return {}}})(),sel=$('#ai-model');$('#ai-base').value=raw.baseUrl||'';$('#ai-key').value=raw.apiKey||'';if(raw.model&&!sel.querySelector(`option[value="${raw.model}"]`))sel.insertAdjacentHTML('beforeend',`<option value="${escapeHtml(raw.model)}">${escapeHtml(raw.model)}</option>`);sel.value=raw.model||'';updateAiLabel()}
+    function updateAiLabel(){const target=activeAiTarget();$('#ai-model-label').textContent=target?target.model:(gatewayConnected()?'网关已连接，请选择模型':'未配置模型');$('#ai-dot').classList.toggle('ok',Boolean(target))}
+
+    /* ===== Sakura-AI-Gateway 账号授权（OAuth 授权码 + PKCE，只填网址即可连接） ===== */
+    const gatewayAuthKey='life-hub-gateway-auth',gatewayPendingKey='life-hub-gateway-pending';
+    let gatewayAuth=null,gatewayModels=[],gatewayRefreshInFlight=null;
+    function loadGatewayAuth(){try{gatewayAuth=JSON.parse(localStorage.getItem(gatewayAuthKey)||'null')}catch(err){gatewayAuth=null}}
+    function persistGatewayAuth(data){try{localStorage.setItem(gatewayAuthKey,JSON.stringify(data))}catch(err){}gatewayAuth=data}
+    function gatewayConnected(){return gatewayAuth&&gatewayAuth.accessToken&&gatewayAuth.issuer?gatewayAuth:null}
+    function activeAiTarget(){const gw=gatewayConnected();if(gw&&gw.model&&gatewayModels.includes(gw.model))return {type:'gateway',baseUrl:gw.issuer,token:gw.accessToken,model:gw.model};const cfg=aiConfig();return cfg?{type:'manual',baseUrl:cfg.baseUrl,token:cfg.apiKey,model:cfg.model}:null}
+    function b64urlFromBytes(bytes){let raw='';for(let i=0;i<bytes.length;i+=1)raw+=String.fromCharCode(bytes[i]);return btoa(raw).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
+    async function sha256B64url(text){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));return b64urlFromBytes(new Uint8Array(buf))}
+    async function refreshGatewayToken(){
+        const auth=gatewayConnected();if(!auth||!auth.refreshToken||!auth.clientId)return false;
+        if(gatewayRefreshInFlight)return gatewayRefreshInFlight;
+        gatewayRefreshInFlight=(async()=>{
+            try{
+                const r=await fetch(new URL('/oauth/token',auth.issuer).href,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},body:new URLSearchParams({grant_type:'refresh_token',client_id:auth.clientId,refresh_token:auth.refreshToken})});
+                const data=await r.json().catch(()=>null);
+                if(!r.ok||!data||!data.access_token)throw new Error(data&&data.error_description||data&&data.error||('HTTP '+r.status));
+                persistGatewayAuth({...auth,accessToken:data.access_token,refreshToken:data.refresh_token||'',accessExpiresAt:Date.now()+(data.expires_in||3600)*1000});
+                return true;
+            }catch(err){persistGatewayAuth({...auth,accessToken:'',refreshToken:''});return false}finally{gatewayRefreshInFlight=null}
+        })();
+        return gatewayRefreshInFlight;
+    }
+    async function gatewayConfigJson(){
+        const auth=gatewayConnected();if(!auth)return null;
+        const r=await fetch(new URL('/api/integration/config',auth.issuer).href,{headers:{Authorization:'Bearer '+auth.accessToken,Accept:'application/json'}});
+        if(r.status===401)return null;if(!r.ok)throw new Error('HTTP '+r.status);
+        return await r.json();
+    }
+    function renderGatewayBlock(cfg,error){
+        const connected=$('#gateway-connected'),form=$('#gateway-connect');if(!connected||!form)return;
+        connected.classList.toggle('hidden',!cfg);form.classList.toggle('hidden',Boolean(cfg));
+        if(cfg){
+            $('#gateway-issuer').textContent=gatewayAuth.issuer;
+            $('#gateway-source').textContent=cfg.apiKey&&cfg.apiKey.name||'—';
+            const sel=$('#gateway-model'),keep=gatewayModels.includes(gatewayAuth.model);
+            sel.innerHTML=gatewayModels.map(id=>`<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`).join('')||'<option value="">该 Key 没有可用模型</option>';
+            sel.value=keep?gatewayAuth.model:(gatewayModels[0]||'');
+            if(!keep&&gatewayAuth.model!==sel.value)persistGatewayAuth({...gatewayAuth,model:sel.value});
+            $('#gateway-model-status').textContent=gatewayModels.length?`已获取 ${gatewayModels.length} 个模型，选择后即可在 AI 助手中对话`:'该 Key 没有可访问的模型，请联系网关管理员调整权限';
+        }else $('#gateway-status').textContent=error||'';
+    }
+    async function loadGatewayConnection(announce){
+        loadGatewayAuth();const auth=gatewayConnected();
+        if(!auth){renderGatewayBlock(null,'');return}
+        try{
+            let cfg=await gatewayConfigJson();
+            if(!cfg){
+                const refreshed=await refreshGatewayToken();
+                if(!refreshed){renderGatewayBlock(null,'网关授权已失效，请重新连接');updateAiLabel();return}
+                cfg=await gatewayConfigJson();
+                if(!cfg){renderGatewayBlock(null,'读取网关配置失败，请重新连接');updateAiLabel();return}
+            }
+            gatewayModels=(cfg.models||[]).map(m=>m&&m.id).filter(Boolean);
+            if(cfg.authorization&&cfg.authorization.clientId&&cfg.authorization.clientId!==auth.clientId)persistGatewayAuth({...auth,clientId:cfg.authorization.clientId});
+            renderGatewayBlock(cfg);updateAiLabel();
+            if(announce)notice('Sakura-AI-Gateway 已连接，AI 助手可以直接对话');
+        }catch(err){renderGatewayBlock(null,'读取网关配置失败：'+(err.message==='Failed to fetch'?'无法连接网关':err.message));updateAiLabel()}
+    }
+    async function connectGateway(){
+        const status=$('#gateway-status'),raw=$('#gateway-url').value.trim();
+        if(!raw){status.textContent='请输入网关地址';return}
+        const base=raw.replace(/\/+$/,'');
+        if(!/^https?:\/\//i.test(base)){status.textContent='网关地址需以 http(s):// 开头';return}
+        let origin;try{origin=new URL(base).origin}catch(err){status.textContent='网关地址格式无效';return}
+        if(origin===location.origin||new URL(origin).hostname===location.hostname){status.textContent='网关与看板不能使用同一主机名（即使端口不同），请使用独立域名或本机 localhost';return}
+        status.textContent='正在连接网关…';
+        try{
+            const health=await (await fetch(new URL('/health',origin).href,{headers:{Accept:'application/json'}})).json();
+            if(!health||health.service!=='sakura-ai-gateway')throw new Error('该地址不是 Sakura-AI-Gateway');
+            const meta=await (await fetch(new URL('/.well-known/oauth-authorization-server',origin).href,{headers:{Accept:'application/json'}})).json();
+            if(!meta||meta.issuer!==origin)throw new Error('网关返回的签发方与填写的地址不一致');
+            const verifier=b64urlFromBytes(crypto.getRandomValues(new Uint8Array(32))),state=b64urlFromBytes(crypto.getRandomValues(new Uint8Array(24))),challenge=await sha256B64url(verifier),redirectUri=location.origin+'/oauth-callback.html';
+            const authorizeUrl=new URL('/oauth/authorize',origin);
+            authorizeUrl.search=new URLSearchParams({client_id:'auto',name:'Life Dashboard',response_type:'code',redirect_uri:redirectUri,scope:'models:read models:invoke offline_access',state,code_challenge:challenge,code_challenge_method:'S256'}).toString();
+            try{localStorage.setItem(gatewayPendingKey,JSON.stringify({issuer:origin,clientId:'auto',redirectUri,state,verifier,tokenEndpoint:new URL('/oauth/token',origin).href}))}catch(err){status.textContent='浏览器阻止了保存连接状态';return}
+            status.textContent='已打开网关授权页，请在弹窗中登录并允许授权';
+            const popup=window.open(authorizeUrl.href,'gateway-oauth','width=520,height=720');
+            if(!popup){status.textContent='浏览器拦截了弹窗，即将跳转到网关授权页';setTimeout(()=>{location.assign(authorizeUrl.href)},900)}
+        }catch(err){status.textContent='连接失败：'+(err.message==='Failed to fetch'?'无法连接网关，请检查地址':err.message)}
+    }
+    async function disconnectGateway(){
+        const auth=gatewayConnected();if(!auth)return;
+        try{await fetch(new URL('/oauth/revoke',auth.issuer).href,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({client_id:auth.clientId||'',token:auth.refreshToken||auth.accessToken})})}catch(err){}
+        try{localStorage.removeItem(gatewayAuthKey)}catch(err){}gatewayAuth=null;gatewayModels=[];
+        renderGatewayBlock(null,'');updateAiLabel();notice('已断开 Sakura-AI-Gateway 连接');
+    }
+    function syncAiSettings(){const raw=(()=>{try{return JSON.parse(localStorage.getItem(aiConfigKey)||'null')||{}}catch(err){return {}}})(),sel=$('#ai-model');$('#ai-base').value=raw.baseUrl||'';$('#ai-key').value=raw.apiKey||'';if(raw.model&&!sel.querySelector(`option[value="${raw.model}"]`))sel.insertAdjacentHTML('beforeend',`<option value="${escapeHtml(raw.model)}">${escapeHtml(raw.model)}</option>`);sel.value=raw.model||'';loadGatewayConnection();updateAiLabel()}
     const aiUiKey='life-hub-ai-ui',aiRefreshMs=30000;let aiRefreshTimer=0,aiMinimized=false;
     function readAiUi(){try{return JSON.parse(localStorage.getItem(aiUiKey)||'{}')}catch(err){return {}}}
     function saveAiUi(){try{localStorage.setItem(aiUiKey,JSON.stringify({minimized:aiMinimized,width:$('#ai-panel')?.offsetWidth,height:$('#ai-panel')?.offsetHeight}))}catch(err){}}
@@ -604,15 +692,33 @@ const $=s=>document.querySelector(s), c=$('#clock'), modal=$('#connect-modal'), 
     function closeAiPanel(){minimizeAiPanel()}
     function collectDashboardContext(){const d=new Date(),lines=[`现在是 ${d.toLocaleString('zh-CN',{hour12:false})}（${$('#today').textContent}），用户称呼 ${displayName()}。`];lines.push(`家庭环境：室内 ${$('#temperature').textContent}°C；${$('#environment').textContent}；连接状态 ${$('#ha-status').textContent}。`);if(weatherSummary)lines.push(`天气：${weatherSummary}。`);if(workspaceSnapshot?.workspaces?.length)lines.push(`工作区：${workspaceSnapshot.workspaces.slice(0,8).map(item=>`${item.name}${workspaceStateMeta[item.state]?.label||'未知'}（${relativeActivity(item.ageMs)}）`).join('、')}。`);const onDevices=latestStates.filter(s=>canControl(s)&&isActive(s)).slice(0,10).map(s=>label(s));if(latestStates.length)lines.push(`Home Assistant：${latestStates.length} 个实体、${registry.areas.length} 个区域；当前开启：${onDevices.length?onDevices.join('、'):'无'}。`);const agenda=[...($('#agenda-list')?.querySelectorAll('.agenda-row')||[])].map(r=>r.textContent.replace(/\s+/g,' ').trim()).slice(0,5);if(agenda.length)lines.push(`今日安排：${agenda.join('；')}。`);const cds=countdowns().map(i=>({name:i.name,days:countdownDays(i)})).filter(i=>i.days!==null);if(cds.length)lines.push(`纪念日：${cds.map(i=>`${i.name}${i.days===0?'就是今天':`还有 ${i.days} 天`}`).join('、')}。`);return lines.join('\n')}
     function renderAiMessages(state){const box=$('#ai-messages');if(!aiHistory.length){box.innerHTML=`<div class="ai-empty"><div class="ai-empty-icon">✦</div><p>我可以读取看板数据与你对话。配置好 AI 后，问问我「家里现在多少度」「总结一下今天的安排」。</p><div class="ai-hints"><button class="ai-hint" type="button">家里现在什么情况？</button><button class="ai-hint" type="button">总结一下我今天的安排</button><button class="ai-hint" type="button">最近有什么值得纪念的日子？</button></div></div>`;box.querySelectorAll('.ai-hint').forEach(btn=>btn.onclick=()=>{$('#ai-question').value=btn.textContent.trim();$('#ai-form').requestSubmit()});return}box.innerHTML=aiHistory.map(m=>`<div class="ai-msg ${m.role==='user'?'user':'bot'}">${escapeHtml(m.content)}</div>`).join('')+(state==='thinking'?'<div class="ai-msg bot thinking">正在思考…</div>':'');scrollAiToBottom()}
-    async function sendAiMessage(text){const cfg=aiConfig();if(!cfg){notice('请先在设置中配置 AI 助手');closeAiPanel();setView('settings');return}aiHistory.push({role:'user',content:text});renderAiMessages('thinking');try{const r=await fetch(cfg.baseUrl+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+cfg.apiKey},body:JSON.stringify({model:cfg.model,messages:[{role:'system',content:'你是"生活中枢"个人看板的内置 AI 助手，用简洁的中文回答。以下是看板的实时数据，回答时优先依据这些数据：\n'+collectDashboardContext()+'\n如果用户想控制设备，引导其在看板的快捷控制或 Home Assistant 区域卡片中操作。'},...aiHistory.slice(-20)],temperature:.6})});if(!r.ok)throw new Error(`接口返回 HTTP ${r.status}`);const data=await r.json(),reply=data.choices?.[0]?.message?.content?.trim();if(!reply)throw new Error('模型没有返回内容');aiHistory.push({role:'assistant',content:reply});renderAiMessages()}catch(err){aiHistory.pop();renderAiMessages();notice('AI 请求失败：'+(err.message==='Failed to fetch'?'无法连接接口，请检查地址与 CORS 设置':err.message))}}
+    async function sendAiMessage(text){
+        let target=activeAiTarget();
+        if(!target){notice(gatewayConnected()?'请在设置中为网关选择模型':'请先在设置中配置或连接 AI 助手');closeAiPanel();setView('settings');return}
+        aiHistory.push({role:'user',content:text});renderAiMessages('thinking');
+        const ask=t=>fetch(t.baseUrl+(t.type==='gateway'?'/v1/chat/completions':'/chat/completions'),{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+t.token},body:JSON.stringify({model:t.model,messages:[{role:'system',content:'你是"生活中枢"个人看板的内置 AI 助手，用简洁的中文回答。以下是看板的实时数据，回答时优先依据这些数据：\n'+collectDashboardContext()+'\n如果用户想控制设备，引导其在看板的快捷控制或 Home Assistant 区域卡片中操作。'},...aiHistory.slice(-20)],temperature:.6})});
+        try{
+            let r=await ask(target);
+            if(r.status===401&&target.type==='gateway'){const refreshed=await refreshGatewayToken();if(!refreshed){renderGatewayBlock(null,'网关授权已失效，请重新连接');throw new Error('网关授权已失效，请重新连接')}target=activeAiTarget();if(!target){renderGatewayBlock(null,'网关授权已失效，请重新连接');throw new Error('网关授权已失效，请重新连接')}r=await ask(target)}
+            if(!r.ok)throw new Error(`接口返回 HTTP ${r.status}`);
+            const data=await r.json(),reply=data.choices?.[0]?.message?.content?.trim();
+            if(!reply)throw new Error('模型没有返回内容');
+            aiHistory.push({role:'assistant',content:reply});renderAiMessages();
+        }catch(err){aiHistory.pop();renderAiMessages();notice('AI 请求失败：'+(err.message==='Failed to fetch'?'无法连接接口，请检查地址与 CORS 设置':err.message))}
+    }
     aiMinimized=Boolean(readAiUi().minimized);renderAiMinimized();
     $('#ai-open').onclick=e=>{e.stopPropagation();openAiPanel()};$('#ai-launcher').onclick=openAiPanel;$('#ai-minimize').onclick=minimizeAiPanel;
     $('#ai-close').onclick=closeAiPanel;
     $('#ai-form').onsubmit=e=>{e.preventDefault();const text=$('#ai-question').value.trim();if(!text)return;$('#ai-question').value='';sendAiMessage(text)};
     $('#ai-fetch-models').onclick=async()=>{const base=$('#ai-base').value.trim().replace(/\/+$/,''),key=$('#ai-key').value.trim(),status=$('#ai-config-status');if(!base||!key){status.textContent='请先填写接口地址和 API Key';return}if(!/^https?:\/\//.test(base)){status.textContent='接口地址需以 http(s):// 开头';return}status.textContent='正在拉取模型列表…';try{const r=await fetch(base+'/models',{headers:{Authorization:'Bearer '+key}});if(!r.ok)throw new Error(`HTTP ${r.status}`);const data=await r.json(),ids=(Array.isArray(data.data)?data.data:[]).map(m=>m&&m.id).filter(Boolean);if(!ids.length)throw new Error('接口未返回任何模型');const sel=$('#ai-model'),current=sel.value;sel.innerHTML=ids.map(id=>`<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`).join('');if(ids.includes(current))sel.value=current;status.textContent=`已获取 ${ids.length} 个模型，请选择后保存`}catch(err){status.textContent='拉取失败：'+(err.message==='Failed to fetch'?'无法连接接口，请检查地址与 CORS':err.message)}};
     $('#ai-config-form').onsubmit=e=>{e.preventDefault();const baseUrl=$('#ai-base').value.trim().replace(/\/+$/,''),apiKey=$('#ai-key').value.trim(),model=$('#ai-model').value,status=$('#ai-config-status');if(!/^https?:\/\//.test(baseUrl)){status.textContent='接口地址需以 http(s):// 开头';return}if(!apiKey){status.textContent='请填写 API Key';return}if(!model){status.textContent='请先拉取并选择模型';return}try{localStorage.setItem(aiConfigKey,JSON.stringify({baseUrl,apiKey,model}))}catch(err){status.textContent='浏览器阻止了保存';return}updateAiLabel();status.textContent='AI 配置已保存';notice('AI 助手配置已保存')};
+    $('#gateway-connect-btn').onclick=()=>connectGateway();
+    $('#gateway-disconnect').onclick=()=>disconnectGateway();
+    $('#gateway-model').onchange=e=>{const auth=gatewayConnected();if(!auth)return;persistGatewayAuth({...auth,model:e.target.value});updateAiLabel();$('#gateway-model-status').textContent=`已选择 ${e.target.value}，可直接在 AI 助手中对话`};
+    window.addEventListener('message',async(event)=>{if(event.origin!==location.origin||event.data?.type!=='life-hub-gateway-connected')return;await loadGatewayConnection(true)});
 
     renderCountdowns();
+    loadGatewayConnection();
     renderAiMessages();setInterval(()=>{if(!aiMinimized)syncWorkspaces();fetchWeather();},aiRefreshMs);
     fetchWeather();
     setInterval(renderCountdowns,60*60*1000);

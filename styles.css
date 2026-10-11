@@ -2257,6 +2257,19 @@ main {
 .ai-model-row { display:flex; gap:8px }
 .ai-model-row select { flex:1; min-width:0 }
 .ai-config-status { font-size:12px; color:var(--muted); min-height:16px; display:block; margin-top:8px }
+/* ===== Sakura-AI-Gateway 账号授权 ===== */
+.gateway-block { display:grid; gap:12px; margin-top:18px }
+.gateway-block.hidden { display:none }
+.gateway-intro b { display:block }
+.gateway-intro small { display:block; margin-top:4px; color:var(--muted); font-size:12px; line-height:1.5 }
+.gateway-head { display:flex; justify-content:space-between; align-items:center; gap:12px }
+.gateway-head .btn { width:auto; flex:none; min-height:36px; padding:0 14px }
+.gateway-meta { display:grid; gap:10px; margin:0 }
+.gateway-meta dt { font-size:12px; color:var(--muted) }
+.gateway-meta dd { margin:4px 0 0; overflow-wrap:anywhere }
+.gateway-block .field { margin:0 }
+.gateway-block .btn { min-height:44px }
+[data-theme="dark"] .gateway-block input, [data-theme="dark"] .gateway-block select { background:#0f1714; border-color:#2a3630; color:var(--ink) }
 
 /* ===== 外观主题切换 ===== */
 .theme-options { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px }
